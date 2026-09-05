@@ -1,0 +1,258 @@
+import express from "express";
+import path from "path";
+import admin from "firebase-admin";
+import { createServer as createViteServer } from "vite";
+
+function initializeFirebaseAdmin() {
+  if (!admin.apps.length) {
+    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+      : null;
+
+    if (serviceAccount) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      return;
+    }
+
+    if (process.env.FIREBASE_PROJECT_ID) {
+      admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+        projectId: process.env.FIREBASE_PROJECT_ID,
+      });
+    }
+  }
+}
+
+async function startServer() {
+  const app = express();
+
+  app.use(express.json());
+
+  // API Health Check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok" });
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body ?? {};
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const normalizedEmail = String(email).trim();
+      initializeFirebaseAdmin();
+
+      if (!admin.apps.length) {
+        return res.status(500).json({ error: "Firebase Admin is not configured" });
+      }
+
+      const userRecord = await admin.auth().getUserByEmail(normalizedEmail);
+      const apiKey = process.env.FIREBASE_API_KEY;
+
+      if (!apiKey) {
+        return res.status(500).json({ error: "Firebase API key is not configured" });
+      }
+
+      const firebaseAuthResponse = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: normalizedEmail,
+            password,
+            returnSecureToken: true,
+          }),
+        }
+      );
+
+      const authData = await firebaseAuthResponse.json();
+
+      if (!firebaseAuthResponse.ok) {
+        return res.status(401).json({
+          error: authData?.error?.message || "Auth failed",
+        });
+      }
+
+      return res.json({
+        uid: userRecord.uid,
+        email: userRecord.email,
+        success: true,
+        idToken: authData.idToken,
+        refreshToken: authData.refreshToken,
+        expiresIn: authData.expiresIn,
+      });
+    } catch (error: any) {
+      const code = error?.code || error?.error?.code;
+      if (
+        code === "auth/user-not-found" ||
+        code === "auth/wrong-password" ||
+        code === "auth/invalid-email" ||
+        code === "auth/invalid-login-credentials"
+      ) {
+        return res.status(401).json({ error: "Auth failed" });
+      }
+
+      console.error("Firebase auth login error:", error);
+      return res.status(500).json({ error: error?.message || "Auth failed" });
+    }
+  });
+
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { email, password, name } = req.body ?? {};
+
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      initializeFirebaseAdmin();
+      if (!admin.apps.length) {
+        return res.status(500).json({ error: "Firebase Admin is not configured" });
+      }
+
+      const userRecord = await admin.auth().createUser({
+        email: String(email).trim(),
+        password: String(password),
+        displayName: name ? String(name).trim() : undefined,
+      });
+
+      return res.status(201).json({
+        uid: userRecord.uid,
+        email: userRecord.email,
+        success: true,
+      });
+    } catch (error: any) {
+      const code = error?.code || error?.error?.code;
+      if (code === "auth/email-already-exists" || code === "auth/uid-already-exists") {
+        return res.status(409).json({ error: "User already exists" });
+      }
+
+      console.error("Firebase auth register error:", error);
+      return res.status(500).json({ error: error?.message || "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+      if (token) {
+        // Firebase tokens are validated server-side when needed; this endpoint is primarily
+        // used to clear client-side session state in the app.
+      }
+
+      return res.json({ success: true, message: "Logged out" });
+    } catch (error: any) {
+      console.error("Logout error:", error);
+      return res.status(500).json({ error: error?.message || "Logout failed" });
+    }
+  });
+
+  // FedaPay API Routes Proxy (Server-side API Key Security)
+  app.post("/api/fedapay/create-transaction", async (req, res) => {
+    try {
+      const { amount, description, customer } = req.body;
+      const secretKey = process.env.FEDAPAY_SECRET_KEY;
+      if (!secretKey) {
+        return res.status(500).json({ error: 'FedaPay is not configured' });
+      }
+
+      const fedapayUrl = 'https://api.fedapay.com/v1/transactions';
+      const response = await fetch(fedapayUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${secretKey}`,
+        },
+        body: JSON.stringify({
+          amount: Math.round(amount),
+          currency: { iso: 'XOF' },
+          description: description || 'Paiement Liencolis Bénin',
+          customer: customer || {},
+        }),
+      });
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('FedaPay transaction error:', error);
+      res.status(500).json({ error: error?.message || 'Transaction failed' });
+    }
+  });
+
+  app.post("/api/fedapay/token/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const secretKey = process.env.FEDAPAY_SECRET_KEY;
+      if (!secretKey) {
+        return res.status(500).json({ error: 'FedaPay is not configured' });
+      }
+
+      const response = await fetch(`https://api.fedapay.com/v1/transactions/${id}/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${secretKey}`,
+        },
+      });
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('FedaPay token error:', error);
+      res.status(500).json({ error: error?.message || 'Token generation failed' });
+    }
+  });
+
+  app.get("/api/fedapay/verify/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const secretKey = process.env.FEDAPAY_SECRET_KEY;
+      if (!secretKey) {
+        return res.status(500).json({ error: 'FedaPay is not configured' });
+      }
+
+      const response = await fetch(`https://api.fedapay.com/v1/transactions/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${secretKey}`,
+        },
+      });
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('FedaPay verify error:', error);
+      res.status(500).json({ error: error?.message || 'Verification failed' });
+    }
+  });
+
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  const PORT = Number(process.env.PORT) || 3000;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();

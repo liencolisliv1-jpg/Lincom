@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for hardened security
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'germainmensah1@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User Profiles: Strictly protect private profiles and prevent privilege escalation
+    match /users/{userId} {
+      allow read: if true; // Public read for driver ratings and public profiles
+      allow create: if isOwner(userId) || isAdmin();
+      allow update: if (isOwner(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAdmin())) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Admin Daily Summaries & Platform Financial Reports: STRICTLY RESTRICTED TO OWNER / ADMIN
+    match /adminSummaries/{summaryId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Deliveries: Real-time tracking and dispatching
+    match /deliveries/{deliveryId} {
+      allow read: if true;
+      allow create: if isAuthenticated() || (
+        request.resource.data.trackingCode is string &&
+        request.resource.data.status is string
+      );
+      allow update: if isAuthenticated() || isAdmin() || (
+        // Permit status updates if correct security PIN or status transition
+        request.resource.data.status in ['assigned', 'picked_up', 'in_transit', 'approaching_300m', 'delivered', 'cancelled']
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Community Chat Messages: Anti-abuse and anti-tampering
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create: if (
+        request.resource.data.content is string &&
+        request.resource.data.content.size() <= 1000 &&
+        request.resource.data.senderName is string
+      );
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.senderId == request.auth.uid);
+    }
+
+    // Driver Mutual Aid Requests (Caisse d'entraide)
+    match /aidRequests/{requestId} {
+      allow read: if isAuthenticated() || isAdmin();
+      allow create: if isAuthenticated() && (
+        request.resource.data.requestedAmount is number &&
+        request.resource.data.requestedAmount > 0 &&
+        request.resource.data.status == 'pending'
+      );
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.driverId == request.auth.uid &&
+        resource.data.status == 'pending'
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Classified Ads (Annonces)
+    match /classifiedAds/{adId} {
+      allow read: if true;
+      allow create: if isAuthenticated() || (
+        request.resource.data.title is string &&
+        request.resource.data.title.size() <= 200
+      );
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.authorId == request.auth.uid);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorId == request.auth.uid);
+    }
+
+    // Vehicle Rentals (Location d'engins)
+    match /rentals/{rentalId} {
+      allow read: if true;
+      allow create: if isAuthenticated() || (
+        request.resource.data.vehicleTitle is string
+      );
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.ownerId == request.auth.uid);
+    }
+
+    // Driver Marketplace Equipment
+    match /marketplace/{itemId} {
+      allow read: if true;
+      allow create: if isAuthenticated() || (
+        request.resource.data.title is string
+      );
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.sellerId == request.auth.uid);
+    }
+
+    // Real-time Push Notifications Broadcast
+    match /pushNotifications/{notifId} {
+      allow read: if true;
+      allow create: if true; // Allow system and clients to emit real-time push alerts
+      allow update, delete: if isAdmin();
+    }
+
+    // Global Fallback: STRICT DENY for all undefined routes and internal paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

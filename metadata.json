@@ -1,0 +1,7 @@
+{
+  "name": "LIENCOLIS - Driver Community",
+  "description": "Application communautaire et sécurisée pour les livreurs béninois, commerçants, particuliers et entreprises : GPS vocal mains-libres, alertes 300m, groupes par ville, annonces éphémères, Mobile Money, assistance IA et entraide.",
+  "websiteUrl": "https://liencolis-driver-communauty.com",
+  "requestFramePermissions": ["geolocation", "microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

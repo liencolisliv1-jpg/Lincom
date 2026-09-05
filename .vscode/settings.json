@@ -1,0 +1,6 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "java": true,
+        "true": true
+    }
+}
