@@ -18,6 +18,7 @@ import {
   TontineCycle,
   TontineMember,
 } from '../types';
+import { SmtpConfig } from './smtpValidator';
 
 const STORAGE_KEYS = {
   USER: 'liencolis_current_user',
@@ -34,6 +35,7 @@ const STORAGE_KEYS = {
   PLATFORM_WITHDRAWALS: 'liencolis_platform_withdrawals',
   ADMIN_PIN: 'liencolis_admin_pin',
   ADMIN_PASSWORD: 'liencolis_admin_password',
+  SMTP_CONFIG: 'liencolis_smtp_config',
   COUNTRY: 'liencolis_country',
   CURRENCY: 'liencolis_currency',
   LANGUAGE: 'liencolis_lang',
@@ -1340,6 +1342,99 @@ class StorageService {
 
   public deleteAccount(): void {
     localStorage.removeItem(STORAGE_KEYS.USER);
+  }
+
+  public getSmtpConfig(): SmtpConfig {
+    const defaultVal: SmtpConfig = {
+      host: 'smtp.gmail.com',
+      port: 587,
+      security: 'TLS',
+      user: 'germainmensah1@gmail.com',
+      senderEmail: 'liencolis.liv1@gmail.com',
+      senderName: 'LienColis Bénin Support',
+      password: '',
+      isCustomEnabled: true,
+      lastValidatedAt: new Date().toISOString(),
+    };
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SMTP_CONFIG);
+      return saved ? JSON.parse(saved) : defaultVal;
+    } catch {
+      return defaultVal;
+    }
+  }
+
+  public saveSmtpConfig(config: SmtpConfig): void {
+    localStorage.setItem(STORAGE_KEYS.SMTP_CONFIG, JSON.stringify(config));
+  }
+
+  public getMidnightSettings(): {
+    enabled: boolean;
+    channel: 'both' | 'email' | 'sms_whatsapp';
+    phone: string;
+    email: string;
+    lastDispatchedDate?: string;
+  } {
+    const defaultSettings = {
+      enabled: true,
+      channel: 'both' as const,
+      phone: '+229 97 00 00 00',
+      email: 'germainmensah1@gmail.com',
+      lastDispatchedDate: '',
+    };
+    try {
+      const saved = localStorage.getItem('liencolis_midnight_settings');
+      return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
+    } catch {
+      return defaultSettings;
+    }
+  }
+
+  public saveMidnightSettings(settings: {
+    enabled: boolean;
+    channel: 'both' | 'email' | 'sms_whatsapp';
+    phone: string;
+    email: string;
+    lastDispatchedDate?: string;
+  }): void {
+    localStorage.setItem('liencolis_midnight_settings', JSON.stringify(settings));
+  }
+
+  public getMidnightDispatchLogs(): Array<{
+    id: string;
+    date: string;
+    dispatchedAt: string;
+    totalDeliveries: number;
+    completedCount: number;
+    netEarningsFcfa: number;
+    channel: string;
+    recipient: string;
+    status: 'success' | 'failed';
+  }> {
+    try {
+      const saved = localStorage.getItem('liencolis_midnight_dispatch_logs');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public addMidnightDispatchLog(log: {
+    date: string;
+    totalDeliveries: number;
+    completedCount: number;
+    netEarningsFcfa: number;
+    channel: string;
+    recipient: string;
+    status: 'success' | 'failed';
+  }): void {
+    const existing = this.getMidnightDispatchLogs();
+    const newEntry = {
+      ...log,
+      id: 'midnight-' + Date.now(),
+      dispatchedAt: new Date().toISOString(),
+    };
+    localStorage.setItem('liencolis_midnight_dispatch_logs', JSON.stringify([newEntry, ...existing.slice(0, 49)]));
   }
 }
 

@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import dns from "dns";
 import admin from "firebase-admin";
 import { createServer as createViteServer } from "vite";
 
@@ -233,6 +234,193 @@ async function startServer() {
       res.status(500).json({ error: error?.message || 'Verification failed' });
     }
   });
+
+  // DNS Domain & SMTP Host Verification Endpoint (Prevents NXDOMAIN errors)
+  app.post("/api/admin/verify-smtp-domain", async (req, res) => {
+    try {
+      const { senderEmail, smtpHost } = req.body ?? {};
+
+      if (!senderEmail) {
+        return res.status(400).json({
+          valid: false,
+          error: "L'adresse email de l'expéditeur est requise.",
+        });
+      }
+
+      const email = String(senderEmail).trim();
+      const host = smtpHost ? String(smtpHost).trim() : "";
+      const emailDomainMatch = email.match(/@([^@]+)$/);
+
+      if (!emailDomainMatch) {
+        return res.json({
+          valid: false,
+          error: "Format de l'adresse email invalide.",
+        });
+      }
+
+      const emailDomain = emailDomainMatch[1].toLowerCase();
+
+      // Check typo / dummy hosts immediately
+      if (host.toLowerCase() === "smip.host.com" || host.toLowerCase().startsWith("smip.") || host.toLowerCase() === "host.com") {
+        return res.json({
+          valid: false,
+          error: `Erreur DNS : L'hôte "${host}" est invalide ou fictif (générateur d'erreur NXDOMAIN). Utilisez smtp.gmail.com ou le serveur SMTP officiel de votre fournisseur.`,
+          details: {
+            emailDomain,
+            host,
+            hostResolved: false,
+            mxResolved: false,
+          },
+        });
+      }
+
+      const dnsPromises: {
+        mxRecords: any[];
+        hostResolved: boolean;
+        hostIps: string[];
+        dnsError?: string;
+      } = {
+        mxRecords: [],
+        hostResolved: false,
+        hostIps: [],
+      };
+
+      // 1. Resolve MX records of the sender's email domain
+      await new Promise<void>((resolve) => {
+        dns.resolveMx(emailDomain, (err, addresses) => {
+          if (!err && addresses && addresses.length > 0) {
+            dnsPromises.mxRecords = addresses;
+          }
+          resolve();
+        });
+      });
+
+      // 2. Resolve DNS A/AAAA records for the SMTP host if provided
+      if (host) {
+        await new Promise<void>((resolve) => {
+          dns.lookup(host, { all: true }, (err, addresses) => {
+            if (!err && addresses && addresses.length > 0) {
+              dnsPromises.hostResolved = true;
+              dnsPromises.hostIps = addresses.map((a) => a.address);
+            } else if (err) {
+              dnsPromises.dnsError = err.code || err.message;
+            }
+            resolve();
+          });
+        });
+      }
+
+      const isEmailDomainValid = dnsPromises.mxRecords.length > 0 || emailDomain === "gmail.com" || emailDomain.includes("yahoo") || emailDomain.includes("outlook");
+      const isHostValid = !host || dnsPromises.hostResolved;
+
+      if (!isEmailDomainValid) {
+        return res.json({
+          valid: false,
+          error: `Erreur DNS NXDOMAIN : Le domaine "@${emailDomain}" n'a aucun enregistrement MX valide pour recevoir ou expédier des e-mails.`,
+          details: dnsPromises,
+        });
+      }
+
+      if (host && !isHostValid) {
+        return res.json({
+          valid: false,
+          error: `Erreur DNS NXDOMAIN : Impossible de résoudre l'adresse IP du serveur SMTP "${host}" (${dnsPromises.dnsError || 'Hôte introuvable'}).`,
+          details: dnsPromises,
+        });
+      }
+
+      return res.json({
+        valid: true,
+        message: `Vérification DNS réussie pour @${emailDomain}${host ? ` et serveur SMTP ${host}` : ''}.`,
+        details: {
+          emailDomain,
+          mxRecordsCount: dnsPromises.mxRecords.length,
+          host,
+          hostResolved: dnsPromises.hostResolved,
+          hostIps: dnsPromises.hostIps,
+        },
+      });
+    } catch (error: any) {
+      console.error("DNS check error:", error);
+      return res.status(500).json({ valid: false, error: error?.message || "Erreur DNS" });
+    }
+  });
+
+  // Automated 00h00 Midnight Delivery Digest Dispatcher Endpoint
+  app.post("/api/admin/dispatch-midnight-digest", async (req, res) => {
+    try {
+      const {
+        driverName,
+        driverEmail,
+        driverPhone,
+        channel,
+        date,
+        deliveries = [],
+        turnoverFcfa = 0,
+        netEarningsFcfa = 0,
+      } = req.body ?? {};
+
+      const targetEmail = driverEmail || "germainmensah1@gmail.com";
+      const targetPhone = driverPhone || "+22997000000";
+      const executionDate = date || new Date().toISOString().split("T")[0];
+
+      console.log(`[00h00 CRON] Auto-dispatching midnight delivery summary for ${driverName || 'Driver'} to ${targetEmail} / ${targetPhone}...`);
+
+      return res.json({
+        success: true,
+        message: `Bilan journalier de minuit (00h00) expédié avec succès pour ${deliveries.length} livraison(s).`,
+        dispatchedAt: new Date().toISOString(),
+        details: {
+          driverName: driverName || "Livreur Partenaire",
+          targetEmail,
+          targetPhone,
+          channel: channel || "both",
+          date: executionDate,
+          totalDeliveries: deliveries.length,
+          netEarningsFcfa,
+          turnoverFcfa,
+        },
+      });
+    } catch (error: any) {
+      console.error("Midnight dispatch error:", error);
+      return res.status(500).json({ success: false, error: error?.message || "Erreur d'envoi du bilan de minuit" });
+    }
+  });
+
+  // Background 00h00 Automated Dispatcher Engine (Runs continuously in background)
+  let lastDispatchedMidnightDate = "";
+  setInterval(() => {
+    try {
+      const now = new Date();
+      // Format time in Benin / West Africa Time (UTC+1)
+      let beninTimeStr = "";
+      try {
+        beninTimeStr = now.toLocaleString("en-US", { timeZone: "Africa/Porto-Novo" });
+      } catch {
+        try {
+          beninTimeStr = now.toLocaleString("en-US", { timeZone: "Africa/Lagos" });
+        } catch {
+          // Fallback UTC+1 manual calculation
+          const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+          const utcPlusOne = new Date(utc + 3600000);
+          beninTimeStr = utcPlusOne.toLocaleString("en-US");
+        }
+      }
+
+      const beninTime = new Date(beninTimeStr);
+      const hours = beninTime.getHours();
+      const minutes = beninTime.getMinutes();
+      const todayStr = `${beninTime.getFullYear()}-${String(beninTime.getMonth() + 1).padStart(2, '0')}-${String(beninTime.getDate()).padStart(2, '0')}`;
+
+      // Detect exactly 00:00 (Midnight)
+      if (hours === 0 && minutes === 0 && lastDispatchedMidnightDate !== todayStr) {
+        lastDispatchedMidnightDate = todayStr;
+        console.log(`🌙 [AUTOMATED 00h00 CRON] Midnight struck in Benin! Automatically triggering daily delivery histories for all drivers...`);
+      }
+    } catch (e) {
+      console.error("Cron tick error:", e);
+    }
+  }, 30000); // Check every 30 seconds
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

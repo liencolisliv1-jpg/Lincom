@@ -21,6 +21,8 @@ import {
   Info,
   ChevronRight,
   ListFilter,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { Delivery } from '../types';
 import { ALL_BENIN_CITIES } from '../constants/beninCities';
@@ -35,26 +37,46 @@ interface GoogleMapViewProps {
 
 // Coordinate lookup for Benin destinations
 export function resolveCoordinates(cityName: string, address?: string): { lat: number; lng: number } {
-  if (!cityName) return { lat: 6.3703, lng: 2.4183 }; // Cotonou centre par défaut
-  const clean = cityName.trim().toLowerCase();
-  const match = ALL_BENIN_CITIES.find(
-    (c) => c.name.toLowerCase() === clean || clean.includes(c.name.toLowerCase()) || c.id === clean
-  );
-  if (match) return { lat: match.lat, lng: match.lng };
+  if (!cityName && !address) return { lat: 6.3703, lng: 2.4183 }; // Cotonou centre par défaut
 
-  // Quartiers connus de Cotonou & Abomey-Calavi
+  // Address-level precise geolocation for Cotonou, Calavi, Porto-Novo, Parakou
   if (address) {
     const addr = address.toLowerCase();
-    if (addr.includes('fidjrosse') || addr.includes('fidjrossè')) return { lat: 6.3625, lng: 2.3789 };
-    if (addr.includes('cadjehoun') || addr.includes('cadjèhoun')) return { lat: 6.3685, lng: 2.4048 };
-    if (addr.includes('haie vive')) return { lat: 6.3601, lng: 2.4189 };
-    if (addr.includes('akpakpa')) return { lat: 6.3758, lng: 2.4589 };
-    if (addr.includes('etoile') || addr.includes('étoile')) return { lat: 6.3752, lng: 2.4162 };
-    if (addr.includes('dantokpa')) return { lat: 6.3775, lng: 2.4358 };
-    if (addr.includes('godomey')) return { lat: 6.4025, lng: 2.3421 };
-    if (addr.includes('calavi') || addr.includes('abomey-calavi')) return { lat: 6.4482, lng: 2.3557 };
+    // Cotonou quartiers & landmarks
+    if (addr.includes('fidjrosse') || addr.includes('fidjrossè') || addr.includes('plage')) return { lat: 6.3625, lng: 2.3789 };
+    if (addr.includes('cadjehoun') || addr.includes('cadjèhoun') || addr.includes('aeroport') || addr.includes('aéroport')) return { lat: 6.3685, lng: 2.4048 };
+    if (addr.includes('haie vive') || addr.includes('cocotiers')) return { lat: 6.3601, lng: 2.4189 };
+    if (addr.includes('akpakpa') || addr.includes('dodome') || addr.includes('dodomè') || addr.includes('segbeya')) return { lat: 6.3758, lng: 2.4589 };
+    if (addr.includes('etoile') || addr.includes('étoile') || addr.includes('maro militaire')) return { lat: 6.3752, lng: 2.4162 };
+    if (addr.includes('dantokpa') || addr.includes('marche') || addr.includes('marché') || addr.includes('st michel')) return { lat: 6.3775, lng: 2.4358 };
     if (addr.includes('menontin') || addr.includes('mènontin')) return { lat: 6.3889, lng: 2.3856 };
-    if (addr.includes('kouhounou') || addr.includes('stade')) return { lat: 6.3881, lng: 2.3789 };
+    if (addr.includes('kouhounou') || addr.includes('stade de l\'amitie') || addr.includes('stade')) return { lat: 6.3881, lng: 2.3789 };
+    if (addr.includes('ganhi') || addr.includes('port autonome') || addr.includes('marina')) return { lat: 6.3582, lng: 2.4331 };
+    if (addr.includes('gbedjromede') || addr.includes('gbédjromèdé') || addr.includes('16eme')) return { lat: 6.3812, lng: 2.4095 };
+    if (addr.includes('agla') || addr.includes('hlassocomè') || addr.includes('sainte rita')) return { lat: 6.3792, lng: 2.3812 };
+    if (addr.includes('zogbo') || addr.includes('zogbohouè')) return { lat: 6.3854, lng: 2.3912 };
+    if (addr.includes('vodje') || addr.includes('vodjè')) return { lat: 6.3712, lng: 2.3985 };
+    if (addr.includes('hindagbe') || addr.includes('missessin')) return { lat: 6.3788, lng: 2.4215 };
+
+    // Abomey-Calavi quartiers
+    if (addr.includes('godomey') || addr.includes('togoudo') || addr.includes('dénou')) return { lat: 6.4025, lng: 2.3421 };
+    if (addr.includes('kpota') || addr.includes('carrefour kpota')) return { lat: 6.4489, lng: 2.3512 };
+    if (addr.includes('akassato') || addr.includes('iita') || addr.includes('zinvié')) return { lat: 6.5122, lng: 2.3598 };
+    if (addr.includes('zogbadje') || addr.includes('zogbadjè') || addr.includes('uac') || addr.includes('campus')) return { lat: 6.4255, lng: 2.3412 };
+    if (addr.includes('arconville') || addr.includes('tankpè') || addr.includes('tankpe')) return { lat: 6.4412, lng: 2.3385 };
+    if (addr.includes('ouedo') || addr.includes('ouédo') || addr.includes('glo-djigbe') || addr.includes('gdiz')) return { lat: 6.5512, lng: 2.2985 };
+
+    // Sèmè & Porto-Novo
+    if (addr.includes('seme') || addr.includes('sèmè') || addr.includes('kraké') || addr.includes('djeregbé')) return { lat: 6.3788, lng: 2.6288 };
+    if (addr.includes('ouando') || addr.includes('avakpa') || addr.includes('djassin') || addr.includes('catchi')) return { lat: 6.5012, lng: 2.6189 };
+  }
+
+  if (cityName) {
+    const clean = cityName.trim().toLowerCase();
+    const match = ALL_BENIN_CITIES.find(
+      (c) => c.name.toLowerCase() === clean || clean.includes(c.name.toLowerCase()) || c.id === clean
+    );
+    if (match) return { lat: match.lat, lng: match.lng };
   }
 
   return { lat: 6.3703, lng: 2.4183 };
@@ -223,6 +245,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   const [fallbackZoom, setFallbackZoom] = useState<'regional' | 'national' | 'coastal'>('coastal');
   const [showAllDeliveriesList, setShowAllDeliveriesList] = useState<boolean>(false);
   const [activePinPopup, setActivePinPopup] = useState<Delivery | null>(null);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   // High-performance interactive Benin delivery map with full visibility of all entities
   const renderFallbackMap = () => {
@@ -297,13 +320,44 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
               🌊 OCÉAN ATLANTIQUE (CÔTE DU BÉNIN)
             </text>
 
-            {/* Major Road Arteries (RNIE 1 & RNIE 2 corridor) */}
-            <g stroke="#334155" strokeWidth="4" strokeLinecap="round" opacity="0.6">
+            {/* Lac Nokoué & Laguna Water Bodies (Crucial for Cotonou / Calavi geography) */}
+            <g opacity="0.55">
+              <ellipse cx="480" cy="270" rx="90" ry="40" fill="#0369a1" stroke="#38bdf8" strokeWidth="1" strokeDasharray="3 3" />
+              <text x="480" y="274" fill="#7dd3fc" fontSize="11" fontWeight="bold" textAnchor="middle" opacity="0.8">
+                🏞️ LAC NOKOUÉ / GANVIÉ
+              </text>
+
+              {/* Chenal de Cotonou & Lagune de Porto-Novo */}
+              <path d="M 450 310 Q 480 340 470 380" fill="none" stroke="#0284c7" strokeWidth="4" />
+              <ellipse cx="680" cy="300" rx="60" ry="25" fill="#0369a1" stroke="#38bdf8" strokeWidth="1" strokeDasharray="2 2" />
+              <text x="680" y="304" fill="#7dd3fc" fontSize="9" fontWeight="bold" textAnchor="middle" opacity="0.7">
+                Lagune Porto-Novo
+              </text>
+            </g>
+
+            {/* Major Road Arteries & Arterial Expressways (RNIE 1, RNIE 2, Boulevard de la Marina) */}
+            <g stroke="#334155" strokeWidth="4" strokeLinecap="round" opacity="0.75">
               {/* Littoral axis: Ouidah - Calavi - Cotonou - Sèmè - Porto-Novo */}
-              <path d="M 60 380 Q 300 340 500 365 T 760 345" fill="none" stroke="#475569" strokeWidth="6" />
-              {/* North-South Backbone to Parakou */}
-              <path d="M 430 365 L 430 80" fill="none" stroke="#475569" strokeWidth="5" />
-              <path d="M 280 370 L 320 220 L 430 180" fill="none" stroke="#334155" strokeWidth="3" />
+              <path d="M 60 380 Q 300 340 500 365 T 760 345" fill="none" stroke="#64748b" strokeWidth="7" />
+              <path d="M 60 380 Q 300 340 500 365 T 760 345" fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="6 6" />
+              {/* North-South RNIE 2 Backbone to Calavi / Parakou */}
+              <path d="M 430 365 L 430 80" fill="none" stroke="#64748b" strokeWidth="6" />
+              <path d="M 430 365 L 430 80" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="8 4" />
+              {/* Boulevard de la Marina / Route des Pêches */}
+              <path d="M 220 395 Q 380 385 530 390" fill="none" stroke="#3b82f6" strokeWidth="4" />
+              {/* Inter-connections & Ring roads */}
+              <path d="M 280 370 L 320 220 L 430 180" fill="none" stroke="#475569" strokeWidth="3" />
+              <path d="M 400 350 L 520 340" fill="none" stroke="#475569" strokeWidth="4" />
+            </g>
+
+            {/* Strategic Landmarks & Key Crossings */}
+            <g fontSize="8" fontWeight="bold" fill="#cbd5e1" opacity="0.85">
+              <text x="390" y="340" fill="#fde047">📍 Carrefour Vèdoko</text>
+              <text x="445" y="348" fill="#fde047">📍 Étoile Rouge</text>
+              <text x="475" y="360" fill="#38bdf8">🏪 Marché Dantokpa</text>
+              <text x="360" y="385" fill="#a7f3d0">✈️ Aéroport Cadjèhoun</text>
+              <text x="500" y="380" fill="#a7f3d0">🚢 Port Autonome Cotonou</text>
+              <text x="350" y="240" fill="#cbd5e1">🎓 Campus UAC Calavi</text>
             </g>
 
             {/* Cities & Hubs on the Map */}
@@ -537,6 +591,25 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
+
+            {/* Expand / Maximize Map Button */}
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-amber-300 text-xs font-bold flex items-center gap-1.5 shadow-md transition"
+              title={isExpanded ? 'Réduire la vue' : 'Agrandir la carte pour voir tous les détails'}
+            >
+              {isExpanded ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span>Réduire</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Agrandir</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -713,27 +786,55 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   };
 
   return (
-    <div className={`relative rounded-2xl overflow-hidden border border-slate-700/80 bg-slate-950 ${className}`}>
-      {!hasValidApiKey ? (
-        renderFallbackMap()
-      ) : (
-        <LocalMapBoundary
-          onErrorTriggered={() => setMapApiFailed(true)}
-          fallback={renderFallbackMap()}
-        >
-          <APIProvider
-            apiKey={effectiveApiKey}
-            onError={(err) => {
-              console.warn('Google Maps APIProvider error:', err);
-              setMapApiFailed(true);
-            }}
+    <div
+      className={
+        isExpanded
+          ? 'fixed inset-0 z-50 bg-slate-950/95 flex flex-col p-2 sm:p-4 backdrop-blur-md'
+          : `relative rounded-2xl overflow-hidden border border-slate-700/80 bg-slate-950 transition-all ${className}`
+      }
+    >
+      <div className="relative w-full h-full rounded-xl overflow-hidden border border-slate-700/60 flex flex-col">
+        {!hasValidApiKey ? (
+          renderFallbackMap()
+        ) : (
+          <LocalMapBoundary
+            onErrorTriggered={() => setMapApiFailed(true)}
+            fallback={renderFallbackMap()}
           >
-            {/* Top overlay badge */}
-            <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-white shadow-lg pointer-events-none">
-              <Navigation className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span className="font-bold">Google Maps Platform</span>
-              <span className="text-slate-400 text-[10px]">Bénin Nav</span>
-            </div>
+            <APIProvider
+              apiKey={effectiveApiKey}
+              onError={(err) => {
+                console.warn('Google Maps APIProvider error:', err);
+                setMapApiFailed(true);
+              }}
+            >
+              {/* Top overlay badge */}
+              <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-white shadow-lg pointer-events-none">
+                <Navigation className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span className="font-bold">Google Maps Platform</span>
+                <span className="text-slate-400 text-[10px]">Bénin Nav</span>
+              </div>
+
+              {/* Expand / Minimize toggle button in Google Maps mode */}
+              <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-amber-300 text-xs font-bold flex items-center gap-1.5 shadow-lg transition"
+                >
+                  {isExpanded ? (
+                    <>
+                      <Minimize2 className="w-3.5 h-3.5" />
+                      <span>Réduire</span>
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      <span>Agrandir</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
             {/* Explicit 100% height container to prevent CF2 Map Height Collapse */}
             <div style={{ width: '100%', height: '100%' }}>
@@ -845,6 +946,7 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
           </APIProvider>
         </LocalMapBoundary>
       )}
+      </div>
     </div>
   );
 };

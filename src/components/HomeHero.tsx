@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { LiencolisLogo } from './LiencolisLogo';
+
+// Direct ESM imports for local assets so Vite processes them properly in dev and production
+import heroDriverImg from '../assets/images/hero_driver_benin_1788086400357.jpg';
+import communityCourierImg from '../assets/images/community_courier_benin_1788441002237.jpg';
+import driversSolidarityImg from '../assets/images/drivers_solidarity_benin_1788441020195.jpg';
+import relayDispatchImg from '../assets/images/relay_dispatch_benin_1788441039563.jpg';
+import appLogoImg from '../assets/images/app_logo_benin_1788086413997.jpg';
+
 import {
   Shield,
   MapPin,
@@ -38,6 +46,7 @@ interface HomeHeroProps {
   onOpenPayment: () => void;
   onInstallApp?: () => void;
   onNavigateToTab?: (tab: string) => void;
+  onTrackParcel?: (code: string) => void;
 }
 
 interface HeroSlide {
@@ -65,12 +74,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   onOpenPayment,
   onInstallApp,
   onNavigateToTab,
+  onTrackParcel,
 }) => {
+  const [heroTrackingCode, setHeroTrackingCode] = useState('');
   // Slides data showing couriers, community ties, shopkeepers and solidarity
   const slides: HeroSlide[] = [
     {
       id: 'driver_gps',
-      image: '/src/assets/images/hero_driver_benin_1788086400357.jpg',
+      image: heroDriverImg,
       fallbackImage: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=1200&auto=format&fit=crop&q=80',
       category: 'SÉCURITÉ ROUTIÈRE',
       categoryColor: 'from-amber-500 to-yellow-400',
@@ -87,7 +98,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
     },
     {
       id: 'community_bonds',
-      image: '/src/assets/images/community_courier_benin_1788441002237.jpg',
+      image: communityCourierImg,
       fallbackImage: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1200&auto=format&fit=crop&q=80',
       category: 'LIEN COMMUNAUTÉ & COMMERÇANTS',
       categoryColor: 'from-emerald-500 to-teal-400',
@@ -104,7 +115,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
     },
     {
       id: 'driver_solidarity',
-      image: '/src/assets/images/drivers_solidarity_benin_1788441020195.jpg',
+      image: driversSolidarityImg,
       fallbackImage: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=1200&auto=format&fit=crop&q=80',
       category: 'FRATERNITÉ & ENTRAIDE MUTUELLE',
       categoryColor: 'from-blue-500 to-indigo-400',
@@ -121,7 +132,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
     },
     {
       id: 'relay_logistics',
-      image: '/src/assets/images/relay_dispatch_benin_1788441039563.jpg',
+      image: relayDispatchImg,
       fallbackImage: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&auto=format&fit=crop&q=80',
       category: 'RÉSEAU NATIONAL 77 COMMUNES',
       categoryColor: 'from-purple-500 to-pink-400',
@@ -306,6 +317,45 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               </button>
             </div>
 
+            {/* Client Direct Package Tracking Fast Search Bar */}
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+                  <Radio className="w-3.5 h-3.5 text-emerald-400 animate-ping" />
+                  <span>Suivre un Colis en Direct (Client / Destinataire) :</span>
+                </span>
+                <span className="text-[10.5px] text-slate-400">Suivi GPS sans compte</span>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (heroTrackingCode.trim() && onTrackParcel) {
+                    onTrackParcel(heroTrackingCode.trim());
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  value={heroTrackingCode}
+                  onChange={(e) => setHeroTrackingCode(e.target.value)}
+                  placeholder="Collez votre code de suivi (ex: LC-2026-9042)..."
+                  className="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  id="hero-tracking-input"
+                />
+                <button
+                  type="submit"
+                  disabled={!heroTrackingCode.trim()}
+                  className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs shadow-md flex items-center gap-1.5 transition shrink-0"
+                  id="hero-track-submit-btn"
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>Suivre mon colis</span>
+                </button>
+              </form>
+            </div>
+
             {/* Quick Access Bar to Core Functional Modules */}
             {onNavigateToTab && (
               <div className="pt-3 border-t border-slate-800/80">
@@ -428,7 +478,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
                   <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700/80 shadow-lg">
                     <img
-                      src="/src/assets/images/app_logo_benin_1788086413997.jpg"
+                      src={appLogoImg}
                       alt="Logo Liencolis"
                       className="w-5 h-5 rounded-full object-cover border border-amber-400"
                       referrerPolicy="no-referrer"

@@ -41,6 +41,7 @@ import { MobileInstallModal } from './components/MobileInstallModal';
 import { PermissionsModal } from './components/PermissionsModal';
 import { LiencolisLogo } from './components/LiencolisLogo';
 import { UpdatesPanel } from './components/UpdatesPanel';
+import { ClientTrackingView } from './components/ClientTrackingView';
 import {
   Smartphone,
   ShieldCheck,
@@ -64,6 +65,13 @@ export default function App() {
   const [themeStatus, setThemeStatus] = useState<ThemeStatus>(() => themeService.getThemeStatus());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [triggerNewDeliveryModal, setTriggerNewDeliveryModal] = useState<number>(0);
+  const [activeTrackingCode, setActiveTrackingCode] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('track') || params.get('trackingCode') || null;
+    }
+    return null;
+  });
 
   const isDarkMode = themeStatus.isDarkMode;
 
@@ -327,8 +335,23 @@ export default function App() {
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
       isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
+      {/* Client Direct Public Parcel Tracking View */}
+      {activeTrackingCode && (
+        <ClientTrackingView
+          trackingCode={activeTrackingCode}
+          deliveries={deliveries}
+          onClose={() => {
+            setActiveTrackingCode(null);
+            if (typeof window !== 'undefined' && window.history) {
+              window.history.pushState({}, '', window.location.pathname);
+            }
+          }}
+          isDarkMode={isDarkMode}
+        />
+      )}
+
       {/* Admin Backoffice View */}
-      {showAdminBackoffice && (
+      {!activeTrackingCode && showAdminBackoffice && (
         <AdminBackoffice
           currentUser={currentUser}
           onLogout={handleLogout}
@@ -336,7 +359,7 @@ export default function App() {
         />
       )}
 
-      {!showAdminBackoffice && (
+      {!activeTrackingCode && !showAdminBackoffice && (
         <>
       {/* Top Main Navigation Bar */}
       <Navbar
@@ -431,6 +454,14 @@ export default function App() {
           onExploreCommunity={() => setCurrentTab('community')}
           onOpenPayment={() => setPaymentModalOpen(true)}
           onInstallApp={() => setShowInstallPrompt(true)}
+          onNavigateToTab={(tab) => setCurrentTab(tab)}
+          onTrackParcel={(code) => {
+            setActiveTrackingCode(code);
+            if (typeof window !== 'undefined' && window.history) {
+              const newUrl = `${window.location.pathname}?track=${encodeURIComponent(code)}`;
+              window.history.pushState({ path: newUrl }, '', newUrl);
+            }
+          }}
         />
       )}
 

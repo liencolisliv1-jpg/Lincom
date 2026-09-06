@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DailyAdministrativeSummary, Delivery, UserProfile, PaymentProvider, AidRequest } from '../types';
 import { AdminAuthPanel } from './AdminAuthPanel';
+import { SmtpBackofficePanel } from './SmtpBackofficePanel';
 import { auth, onAuthStateChanged } from '../services/firebase';
 import { firestoreService } from '../services/firestoreService';
 import { storageService } from '../services/storageService';
@@ -78,7 +79,7 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
   onUpdateAidRequest,
   isDarkMode,
 }) => {
-  const [activeTab, setActiveTab] = useState<'admin_panel' | 'aid_validation' | 'commissions_treasury' | 'firestore_database' | 'launch_checklist'>('admin_panel');
+  const [activeTab, setActiveTab] = useState<'admin_panel' | 'aid_validation' | 'commissions_treasury' | 'firestore_database' | 'smtp_settings' | 'launch_checklist'>('admin_panel');
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [firebaseAdminUser, setFirebaseAdminUser] = useState<any>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
@@ -958,6 +959,15 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
             >
               <Database className="w-3.5 h-3.5 text-blue-300" />
               <span>Base Firestore Cloud</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('smtp_settings')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === 'smtp_settings' ? 'bg-indigo-600 text-white font-black shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5 text-amber-400" />
+              <span>Contrôle SMTP & DNS</span>
             </button>
             <button
               onClick={() => setActiveTab('launch_checklist')}
@@ -2053,7 +2063,7 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
                   </div>
                   <div className="flex items-start gap-2 text-slate-300">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>3. Storage :</strong> Prêt pour stocker les photos des colis et pièces d'identité livreurs.</span>
+                    <span><strong>3. Configuration SMTP :</strong> Vérifiez le domaine de messagerie dans l'onglet <em>Contrôle SMTP & DNS</em> pour éviter les erreurs NXDOMAIN.</span>
                   </div>
                 </div>
               </div>
@@ -2068,15 +2078,14 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>Activer Authentification Firebase</span>
                 </a>
-                <a
-                  href="https://console.firebase.google.com/project/lincom-1ecc6/firestore"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition-all"
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('smtp_settings')}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow flex items-center gap-1.5 transition-all"
                 >
-                  <Database className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Voir Firestore Cloud</span>
-                </a>
+                  <Mail className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Vérifier Domaine SMTP</span>
+                </button>
               </div>
             </div>
 
@@ -2256,6 +2265,8 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
             </div>
           </div>
         </div>
+      ) : activeTab === 'smtp_settings' ? (
+        <SmtpBackofficePanel isDarkMode={isDarkMode} />
       ) : null}
 
       {/* Modal de Modification du Code PIN ou Mot de Passe Administrateur Propriétaire */}

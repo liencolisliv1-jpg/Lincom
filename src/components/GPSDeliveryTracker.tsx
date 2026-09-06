@@ -9,7 +9,9 @@ import { notificationService } from '../services/notificationService';
 import { InAppCallScreen } from './InAppCallScreen';
 import { LiveTrackingModal } from './LiveTrackingModal';
 import { RouteOptimizerModal } from './RouteOptimizerModal';
+import { DailyDeliveryMidnightDigestModal } from './DailyDeliveryMidnightDigestModal';
 import { GoogleMapView } from './GoogleMapView';
+import { LeafletMapView } from './LeafletMapView';
 import {
   Navigation,
   MapPin,
@@ -140,8 +142,9 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
   const [callTarget, setCallTarget] = useState<'client' | 'emergency'>('client');
   const [showLiveTrackingModal, setShowLiveTrackingModal] = useState(false);
   const [showRouteOptimizerModal, setShowRouteOptimizerModal] = useState(false);
+  const [showMidnightDigestModal, setShowMidnightDigestModal] = useState(false);
   const [showGmailModal, setShowGmailModal] = useState(false);
-  const [mapMode, setMapMode] = useState<'google_maps' | 'vector_radar'>('google_maps');
+  const [mapMode, setMapMode] = useState<'google_maps' | 'openstreetmap' | 'vector_radar'>('openstreetmap');
   const [ratingScore, setRatingScore] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [pinInput, setPinInput] = useState('');
@@ -382,6 +385,69 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
   const isDriver = currentUser?.role === 'driver';
   const isMuted = isDriver && storageService.isDriverMuted(currentUser);
 
+  // Automated 00h00 Midnight Delivery Digest Background Runner
+  // Dispatches the daily summary automatically every night at 00:00 without requiring the driver to touch their phone
+  useEffect(() => {
+    const checkMidnightAutoDispatch = async () => {
+      try {
+        const midnightSettings = storageService.getMidnightSettings();
+        if (!midnightSettings.enabled) return;
+
+        const now = new Date();
+        const beninTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Porto_Novo' }));
+        const hours = beninTime.getHours();
+        const minutes = beninTime.getMinutes();
+        const todayStr = beninTime.toISOString().split('T')[0];
+
+        const lastDispatched = localStorage.getItem('liencolis_midnight_auto_dispatched_day');
+
+        // Trigger if midnight (00h00) is reached or first open
+        if (hours === 0 && minutes === 0 && lastDispatched !== todayStr) {
+          localStorage.setItem('liencolis_midnight_auto_dispatched_day', todayStr);
+
+          const completedCount = deliveries.filter((d) => d.status === 'delivered').length;
+          const turnover = deliveries.filter((d) => d.status === 'delivered').reduce((s, d) => s + (d.deliveryFee || 0), 0);
+          const comm = deliveries.filter((d) => d.status === 'delivered').reduce((s, d) => s + (d.commissionAmount || 0), 0);
+          const net = turnover - comm;
+
+          await fetch('/api/admin/dispatch-midnight-digest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              driverName: currentUser?.name || 'Livreur Partenaire',
+              driverEmail: currentUser?.email || midnightSettings.email,
+              driverPhone: currentUser?.phone || midnightSettings.phone,
+              channel: midnightSettings.channel,
+              date: todayStr,
+              deliveries,
+              turnoverFcfa: turnover,
+              netEarningsFcfa: net,
+            }),
+          });
+
+          storageService.addMidnightDispatchLog({
+            date: todayStr,
+            totalDeliveries: deliveries.length,
+            completedCount,
+            netEarningsFcfa: net,
+            channel: midnightSettings.channel,
+            recipient: `${currentUser?.phone || midnightSettings.phone} / ${currentUser?.email || midnightSettings.email}`,
+            status: 'success',
+          });
+
+          setGpsStatusMessage('🌙 Bilan journalier de 00h00 expédié automatiquement à votre WhatsApp / E-mail !');
+          setTimeout(() => setGpsStatusMessage(''), 8000);
+        }
+      } catch (e) {
+        console.warn('Midnight auto-dispatcher error:', e);
+      }
+    };
+
+    const interval = setInterval(checkMidnightAutoDispatch, 30000);
+    checkMidnightAutoDispatch();
+    return () => clearInterval(interval);
+  }, [deliveries, currentUser]);
+
   const handleCreateDelivery = (e: React.FormEvent) => {
     e.preventDefault();
     if (isMuted) {
@@ -568,6 +634,21 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
           </button>
 
 
+          {/* Midnight Daily Digest Button (00h00) */}
+          <button
+            type="button"
+            onClick={() => setShowMidnightDigestModal(true)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-purple-900/90 to-indigo-900/90 hover:from-purple-800 hover:to-indigo-800 text-amber-300 border border-purple-500/40 px-3.5 py-2 rounded-xl text-xs font-extrabold shadow-md transition-all hover:scale-[1.02]"
+            id="open-midnight-digest-btn"
+            title="Consulter ou programmer l'envoi du récapitulatif de toutes les courses à 00h00"
+          >
+            <Clock className="w-4 h-4 text-amber-400" />
+            <span>Bilan Minuit (00h00)</span>
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-amber-400/20 text-[10px] font-mono text-amber-300">
+              SMS/Mail
+            </span>
+          </button>
+
           {/* Route Optimization Google Maps Button */}
           <button
             onClick={() => setShowRouteOptimizerModal(true)}
@@ -705,56 +786,108 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
           {/* Main Map & Interactive Route Navigation View (7 cols) */}
           <div className="lg:col-span-7 space-y-4">
             <div className="relative rounded-2xl bg-slate-900 border border-slate-700/80 overflow-hidden shadow-2xl">
-              {/* Map Header Status Overlay */}
-              <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
-                <div className="pointer-events-auto bg-slate-950/90 backdrop-blur-md border border-slate-700 px-3.5 py-2 rounded-xl text-xs flex items-center gap-2.5 shadow-lg">
-                  <div className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></div>
-                  <div>
-                    <span className="font-bold text-white">{selectedDelivery.dropoffCity}</span>
+              {/* TOP MASTER MAP TOOLBAR - ALWAYS VISIBLE, SHARP & UNCLUTTERED */}
+              <div className="p-3.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                {/* Destination and Security Anti-Theft Pin */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-xl text-xs shadow-sm">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></div>
+                    <span className="font-extrabold text-white">{selectedDelivery.dropoffCity}</span>
                     <span className="text-slate-400"> • Vers {selectedDelivery.dropoffAddress}</span>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm">
+                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-slate-300">Code PIN :</span>
+                    <span className="font-mono font-bold text-amber-400">#{selectedDelivery.securityPin}</span>
                   </div>
                 </div>
 
-                <div className="pointer-events-auto flex items-center gap-2">
-                  {/* Toggle Map Mode Google Maps / Vector */}
-                  <div className="bg-slate-950/90 backdrop-blur-md border border-slate-700 p-0.5 rounded-xl flex items-center shadow-lg text-[11px]">
+                {/* Map Mode Buttons ("OpenStreetMap", "Google Maps", "Simulation Radar") + ETA + Smartphone GPS */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Mode Toggles */}
+                  <div className="bg-slate-900 border border-slate-700 p-1 rounded-xl flex items-center gap-1 shadow-md">
+                    <button
+                      type="button"
+                      onClick={() => setMapMode('openstreetmap')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                        mapMode === 'openstreetmap'
+                          ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/30'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      }`}
+                      id="toggle-mode-openstreetmap"
+                      title="Carte OpenStreetMap 100% Gratuite (Sans clé Google)"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>OpenStreetMap (Gratuit)</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => setMapMode('google_maps')}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
                         mapMode === 'google_maps'
-                          ? 'bg-blue-600 text-white shadow'
-                          : 'text-slate-400 hover:text-white'
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
                       }`}
+                      id="toggle-mode-google-maps"
                     >
-                      <MapPin className="w-3 h-3 text-amber-300" />
+                      <MapPin className="w-3.5 h-3.5 text-amber-300" />
                       <span>Google Maps</span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setMapMode('vector_radar')}
-                      className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
                         mapMode === 'vector_radar'
-                          ? 'bg-blue-600 text-white shadow'
-                          : 'text-slate-400 hover:text-white'
+                          ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-500/30'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
                       }`}
+                      id="toggle-mode-vector-radar"
                     >
-                      <Layers className="w-3 h-3 text-emerald-300" />
-                      <span>Radar Simulateur</span>
+                      <Layers className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Radar Solo</span>
                     </button>
                   </div>
 
-                  <div className="bg-amber-400 text-slate-950 font-black px-3.5 py-1.5 rounded-xl text-xs shadow-lg flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
+                  {/* ETA Badge */}
+                  <div className="bg-amber-400 text-slate-950 font-black px-3 py-1.5 rounded-xl text-xs shadow-md flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-950" />
                     <span>~ {selectedDelivery.estimatedArrivalMinutes} min</span>
-                    <span>({selectedDelivery.distanceRemainingMeters} m)</span>
+                    <span className="text-[10px] opacity-80 font-mono">({selectedDelivery.distanceRemainingMeters}m)</span>
                   </div>
+
+                  {/* GPS Smartphone Activator Button */}
+                  <button
+                    onClick={toggleRealGpsTracking}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 transition-all ${
+                      isRealGpsActive
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 animate-pulse'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700'
+                    }`}
+                    title="Activer la géolocalisation GPS en direct de votre smartphone"
+                    id="map-toggle-real-gps-btn"
+                  >
+                    <LocateFixed className="w-3.5 h-3.5" />
+                    <span>{isRealGpsActive ? '🛰️ GPS Smartphone Actif' : 'Activer GPS Smartphone'}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Conditional Display: Real Google Maps View or Vector Simulation */}
-              {mapMode === 'google_maps' ? (
-                <div className="w-full h-80 sm:h-96 relative">
+              {/* Conditional Display: OpenStreetMap Leaflet, Google Maps, or Vector Simulation */}
+              {mapMode === 'openstreetmap' ? (
+                <div className="w-full h-[460px] sm:h-[540px] lg:h-[620px] relative">
+                  <LeafletMapView
+                    deliveries={deliveries}
+                    selectedDeliveryId={selectedDelivery.id}
+                    onSelectDelivery={(id) => setSelectedDeliveryId(id)}
+                    userCoords={realGpsCoords}
+                    className="w-full h-full"
+                  />
+                </div>
+              ) : mapMode === 'google_maps' ? (
+                <div className="w-full h-[460px] sm:h-[540px] lg:h-[620px] relative">
                   <GoogleMapView
                     deliveries={deliveries}
                     selectedDeliveryId={selectedDelivery.id}
@@ -762,33 +895,10 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
                     userCoords={realGpsCoords}
                     className="w-full h-full"
                   />
-
-                  {/* Anti-theft pin tag */}
-                  <div className="absolute bottom-3 left-3 z-10 bg-slate-900/90 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 pointer-events-none">
-                    <Shield className="w-4 h-4 text-emerald-400" />
-                    <span className="text-slate-200">Anti-Vol Scellé Code : </span>
-                    <span className="font-mono font-bold text-amber-400 tracking-wider">#{selectedDelivery.securityPin}</span>
-                  </div>
-
-                  {/* Real GPS smartphone activator button */}
-                  <div className="absolute bottom-3 right-3 z-10 flex items-center gap-2">
-                    <button
-                      onClick={toggleRealGpsTracking}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-black shadow-lg flex items-center gap-1.5 transition-all ${
-                        isRealGpsActive
-                          ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 animate-pulse'
-                          : 'bg-slate-900/90 backdrop-blur hover:bg-slate-800 text-slate-200 border border-slate-700'
-                      }`}
-                      title="Activer le GPS réel de votre smartphone"
-                    >
-                      <LocateFixed className="w-3.5 h-3.5" />
-                      <span>{isRealGpsActive ? '🛰️ GPS Smartphone Actif' : 'Activer GPS Smartphone'}</span>
-                    </button>
-                  </div>
                 </div>
               ) : (
                 /* Vector Interactive Map Simulation Stage */
-                <div className="w-full h-80 sm:h-96 bg-slate-950 relative flex items-center justify-center overflow-hidden">
+                <div className="w-full h-[460px] sm:h-[540px] lg:h-[620px] bg-slate-950 relative flex items-center justify-center overflow-hidden">
                 {/* SVG Detailed City Grid Map (Cotonou / Calavi style) */}
                 <svg viewBox="0 0 600 400" className="w-full h-full object-cover">
                   {/* Water / Lagoon background */}
@@ -1616,6 +1726,14 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
             : undefined)
         }
         onApplyOptimizedOrder={handleApplyOptimizedOrder}
+      />
+
+      {/* Daily Midnight Delivery Summary Modal (00h00) */}
+      <DailyDeliveryMidnightDigestModal
+        isOpen={showMidnightDigestModal}
+        onClose={() => setShowMidnightDigestModal(false)}
+        currentUser={currentUser}
+        deliveries={deliveries}
       />
     </div>
   );
