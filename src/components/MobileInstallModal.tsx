@@ -107,13 +107,21 @@ export const MobileInstallModal: React.FC<MobileInstallModalProps> = ({
         {/* Header */}
         <div className="p-5 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              <Smartphone className="w-5 h-5" />
+            <div className="w-12 h-12 rounded-2xl bg-[#0A162B] border border-amber-400/40 p-1 shrink-0 shadow-lg flex items-center justify-center">
+              <img
+                src="/icon.svg"
+                alt="Logo LienColis"
+                className="w-full h-full object-contain"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
-              <h3 className="text-base font-black text-white">Hub Mobile : APK, Play Store & PWA</h3>
+              <h3 className="text-base font-black text-white flex items-center gap-1.5">
+                <span>Hub Mobile & Installation</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">Icône Active</span>
+              </h3>
               <p className="text-xs text-slate-400">
-                Génération Android native, notifications & installation directe
+                Installation directe avec l'icône officielle LienColis sur tous smartphones
               </p>
             </div>
           </div>

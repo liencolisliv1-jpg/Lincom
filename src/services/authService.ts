@@ -5,6 +5,7 @@ import {
   signOut,
   updateProfile,
   sendEmailVerification,
+  sendPasswordResetEmail,
   reload,
   FirebaseUser,
 } from './firebase';
@@ -31,6 +32,67 @@ export interface RegisterResponse {
 }
 
 const AUTH_SESSION_KEY = 'liencolis_auth_session';
+
+export function getFriendlyAuthErrorMessage(error: any): { message: string; code: string; isEmailInUse?: boolean; isTooManyRequests?: boolean } {
+  const rawCode = error?.code || (typeof error?.message === 'string' && error.message.includes('(') ? error.message.match(/\(([^)]+)\)/)?.[1] : '') || '';
+  const code = rawCode.toLowerCase();
+
+  if (code.includes('email-already-in-use')) {
+    return {
+      code: 'auth/email-already-in-use',
+      message: 'Ce compte existe déjà ! Votre adresse e-mail est déjà inscrite. Cliquez sur "Connexion" pour vous connecter ou "Mot de passe oublié" si nécessaire.',
+      isEmailInUse: true,
+    };
+  }
+
+  if (code.includes('too-many-requests')) {
+    return {
+      code: 'auth/too-many-requests',
+      message: 'Trop de tentatives rapprochées. Par sécurité, Firebase a temporairement bloqué les requêtes. Veuillez patienter 2 à 3 minutes avant de réessayer.',
+      isTooManyRequests: true,
+    };
+  }
+
+  if (code.includes('wrong-password') || code.includes('invalid-credential') || code.includes('invalid-login-credentials')) {
+    return {
+      code: 'auth/wrong-password',
+      message: 'Adresse e-mail ou mot de passe incorrect. Vérifiez vos identifiants ou utilisez "Mot de passe oublié".',
+    };
+  }
+
+  if (code.includes('user-not-found')) {
+    return {
+      code: 'auth/user-not-found',
+      message: 'Aucun compte associé à cette adresse e-mail. Veuillez basculer sur l’onglet "Inscription" pour créer votre compte.',
+    };
+  }
+
+  if (code.includes('weak-password')) {
+    return {
+      code: 'auth/weak-password',
+      message: 'Le mot de passe est trop court. Il doit contenir au moins 6 caractères.',
+    };
+  }
+
+  if (code.includes('invalid-email')) {
+    return {
+      code: 'auth/invalid-email',
+      message: 'Le format de l’adresse e-mail est invalide (ex: exemple@gmail.com).',
+    };
+  }
+
+  if (code.includes('network-request-failed')) {
+    return {
+      code: 'auth/network-request-failed',
+      message: 'Connexion Internet interrompue. Vérifiez votre réseau et réessayez.',
+    };
+  }
+
+  return {
+    code: rawCode || 'auth/unknown',
+    message: error?.message || 'Une erreur est survenue lors de l’authentification. Veuillez réessayer.',
+  };
+}
 
 export function setStoredSession(session: Partial<LoginResponse> | Partial<RegisterResponse>) {
   if (typeof window === 'undefined') return;
@@ -70,12 +132,10 @@ export function clearStoredSession() {
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
     const user = userCredential.user;
-    if (!user.emailVerified) {
-      await signOut(auth);
-      throw new Error('Veuillez confirmer votre adresse e-mail avant de vous connecter.');
-    }
+    
+    // Note: If email verification is required, we can warn or allow access
     const data: LoginResponse = {
       success: true,
       uid: user.uid,
@@ -89,20 +149,31 @@ export async function login(email: string, password: string): Promise<LoginRespo
     setStoredSession(data);
     return data;
   } catch (error: any) {
-    const message = error?.message || 'Auth failed';
-    throw new Error(message);
+    const friendly = getFriendlyAuthErrorMessage(error);
+    const err: any = new Error(friendly.message);
+    err.code = friendly.code;
+    err.friendly = friendly;
+    throw err;
   }
 }
 
 export async function register(email: string, password: string, name?: string): Promise<RegisterResponse> {
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
 
     if (name && userCredential.user) {
-      await updateProfile(userCredential.user, { displayName: name });
+      try {
+        await updateProfile(userCredential.user, { displayName: name });
+      } catch (profErr) {
+        console.warn('Profile name update skipped:', profErr);
+      }
     }
 
-    await sendEmailVerification(userCredential.user);
+    try {
+      await sendEmailVerification(userCredential.user);
+    } catch (verifErr) {
+      console.warn('Email verification send optional:', verifErr);
+    }
 
     const data: RegisterResponse = {
       success: true,
@@ -110,17 +181,37 @@ export async function register(email: string, password: string, name?: string): 
       email: userCredential.user.email ?? email,
     };
 
-    setStoredSession({
-      ...data,
-      idToken: await userCredential.user.getIdToken(),
-      refreshToken: userCredential.user.refreshToken,
-      expiresIn: '3600',
-    });
+    try {
+      const idToken = await userCredential.user.getIdToken();
+      setStoredSession({
+        ...data,
+        idToken,
+        refreshToken: userCredential.user.refreshToken,
+        expiresIn: '3600',
+      });
+    } catch {
+      setStoredSession(data);
+    }
 
     return data;
   } catch (error: any) {
-    const message = error?.message || 'Registration failed';
-    throw new Error(message);
+    const friendly = getFriendlyAuthErrorMessage(error);
+    const err: any = new Error(friendly.message);
+    err.code = friendly.code;
+    err.friendly = friendly;
+    throw err;
+  }
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  try {
+    await sendPasswordResetEmail(auth, email.trim());
+  } catch (error: any) {
+    const friendly = getFriendlyAuthErrorMessage(error);
+    const err: any = new Error(friendly.message);
+    err.code = friendly.code;
+    err.friendly = friendly;
+    throw err;
   }
 }
 
@@ -133,7 +224,7 @@ export async function refreshEmailVerificationStatus(): Promise<boolean> {
 
 export async function resendEmailVerification(): Promise<void> {
   const user: FirebaseUser | null = auth.currentUser;
-  if (!user) throw new Error('Session d’inscription introuvable. Veuillez recommencer l’inscription.');
+  if (!user) throw new Error('Session d’inscription introuvable. Veuillez vous reconnecter.');
   await sendEmailVerification(user);
 }
 

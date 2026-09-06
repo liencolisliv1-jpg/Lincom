@@ -1,44 +1,74 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle (Dark Navy) -->
+  <circle cx="512" cy="512" r="500" fill="#0A162B" />
+  
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0B192C" />
-      <stop offset="100%" stop-color="#1E293B" />
+    <!-- Green Swirl Gradients -->
+    <linearGradient id="greenGradMain" x1="180" y1="300" x2="490" y2="600" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#00A859" />
+      <stop offset="40%" stopColor="#10B981" />
+      <stop offset="100%" stopColor="#057A44" />
     </linearGradient>
-    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FBBF24" />
-      <stop offset="100%" stop-color="#F59E0B" />
+    <linearGradient id="greenGradShade" x1="200" y1="260" x2="450" y2="580" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#22C55E" />
+      <stop offset="60%" stopColor="#10B981" />
+      <stop offset="100%" stopColor="#046A38" />
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="12" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-    </filter>
+
+    <!-- Gold/Yellow Swirl Gradients -->
+    <linearGradient id="goldGradMain" x1="530" y1="300" x2="840" y2="600" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#F59E0B" />
+      <stop offset="40%" stopColor="#FBBF24" />
+      <stop offset="100%" stopColor="#D97706" />
+    </linearGradient>
+    <linearGradient id="goldGradShade" x1="570" y1="260" x2="820" y2="580" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#FCD34D" />
+      <stop offset="60%" stopColor="#F59E0B" />
+      <stop offset="100%" stopColor="#B45309" />
+    </linearGradient>
   </defs>
 
-  <!-- Background rounded squircle -->
-  <rect width="512" height="512" rx="110" fill="url(#bgGrad)" />
-  <rect width="504" height="504" x="4" y="4" rx="106" fill="none" stroke="#334155" stroke-width="6" />
-
-  <!-- Outer Energy Ring -->
-  <circle cx="256" cy="256" r="190" fill="none" stroke="#F59E0B" stroke-width="6" stroke-dasharray="16 12" opacity="0.4" />
-
-  <!-- Benin Flag accent strip -->
-  <g transform="translate(206, 68)">
-    <rect x="0" y="0" width="32" height="12" rx="4" fill="#10B981" />
-    <rect x="34" y="0" width="32" height="12" rx="4" fill="#F59E0B" />
-    <rect x="68" y="0" width="32" height="12" rx="4" fill="#EF4444" />
+  <!-- Left Green Infinity Loop Swirls -->
+  <g>
+    <!-- Outer primary swirl -->
+    <path d="M 370 265 C 220 265 188 380 188 475 C 188 570 250 630 370 630 C 465 630 500 560 512 505 C 475 565 425 595 365 595 C 275 595 240 540 240 475 C 240 405 285 320 370 320 C 445 320 482 390 512 445 C 475 340 435 265 370 265 Z" fill="url(#greenGradMain)" />
+    <!-- Secondary internal ribbon accent -->
+    <path d="M 360 290 C 255 290 215 375 215 470 C 215 545 260 595 345 595 C 410 595 450 550 480 495 C 455 525 410 555 355 555 C 285 555 258 505 258 460 C 258 395 300 335 375 335 C 415 335 448 360 475 405 C 445 330 405 290 360 290 Z" fill="url(#greenGradShade)" opacity="0.9" />
   </g>
 
-  <!-- Pin / Courier Shield -->
-  <path d="M256 120 C185 120 128 177 128 248 C128 340 256 424 256 424 C256 424 384 340 384 248 C384 177 327 120 256 120 Z" 
-        fill="url(#amberGrad)" 
-        filter="url(#glow)" />
+  <!-- Right Gold/Yellow Infinity Loop Swirls -->
+  <g>
+    <!-- Outer primary swirl -->
+    <path d="M 654 265 C 804 265 836 380 836 475 C 836 570 774 630 654 630 C 559 630 524 560 512 505 C 549 565 599 595 659 595 C 749 595 784 540 784 475 C 784 405 739 320 654 320 C 579 320 542 390 512 445 C 549 340 589 265 654 265 Z" fill="url(#goldGradMain)" />
+    <!-- Secondary internal ribbon accent -->
+    <path d="M 664 290 C 769 290 809 375 809 470 C 809 545 764 595 679 595 C 614 595 574 550 544 495 C 569 525 614 555 669 555 C 739 555 766 505 766 460 C 766 395 724 335 649 335 C 609 335 576 360 549 405 C 579 330 619 290 664 290 Z" fill="url(#goldGradShade)" opacity="0.9" />
+  </g>
 
-  <!-- Inner Dark Core -->
-  <circle cx="256" cy="240" r="70" fill="#0B192C" />
+  <!-- Central Isometric 3D Delivery Box -->
+  <g transform="translate(422, 342)">
+    <!-- Top Face -->
+    <polygon points="90,0 180,48 90,96 0,48" fill="#FFFFFF" stroke="#0A162B" stroke-width="6" stroke-linejoin="round" />
+    <!-- Left Face -->
+    <polygon points="0,48 90,96 90,192 0,144" fill="#E2E8F0" stroke="#0A162B" stroke-width="6" stroke-linejoin="round" />
+    <!-- Right Face -->
+    <polygon points="90,96 180,48 180,144 90,192" fill="#CBD5E1" stroke="#0A162B" stroke-width="6" stroke-linejoin="round" />
+    <!-- Top Box Tape / Seam -->
+    <line x1="45" y1="24" x2="135" y2="72" stroke="#0A162B" stroke-width="9" stroke-linecap="round" />
+    <!-- Front Box Tape / Fold Tab -->
+    <polygon points="86,75 94,80 94,115 86,110" fill="#0A162B" />
+  </g>
 
-  <!-- Fast Courier Lightning / Navigation Arrow -->
-  <path d="M265 190 L225 245 L255 245 L240 290 L290 235 L260 235 Z" fill="#FBBF24" />
-
-  <!-- Brand Wordmark at Bottom -->
-  <text x="256" y="468" text-anchor="middle" fill="#F8FAFC" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="34" letter-spacing="4">LIENCOLIS</text>
+  <!-- LIENCOLIS Brand Wordmark (White Sans-Serif Bold Tracking) -->
+  <text 
+    x="512" 
+    y="775" 
+    text-anchor="middle" 
+    fill="#FFFFFF" 
+    font-family="'Plus Jakarta Sans', 'Outfit', 'Montserrat', -apple-system, sans-serif" 
+    font-size="96" 
+    font-weight="900" 
+    letter-spacing="9"
+  >
+    LIENCOLIS
+  </text>
 </svg>

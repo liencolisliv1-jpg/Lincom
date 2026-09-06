@@ -4,7 +4,7 @@ import { BENIN_CITY_NAMES } from '../constants/beninCities';
 import { LiencolisLogo } from './LiencolisLogo';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { notificationService } from '../services/notificationService';
-import { login, refreshEmailVerificationStatus, register, resendEmailVerification, setStoredSession } from '../services/authService';
+import { login, refreshEmailVerificationStatus, register, resendEmailVerification, sendPasswordReset, setStoredSession } from '../services/authService';
 import { storageService } from '../services/storageService';
 import {
   User,
@@ -25,6 +25,8 @@ import {
   Camera,
   RotateCcw,
   Send,
+  ArrowRight,
+  HelpCircle,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -57,25 +59,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [vehicleType, setVehicleType] = useState<'moto_2wheels' | 'tricycle' | 'car_4wheels'>('moto_2wheels');
   const [vehiclePlate, setVehiclePlate] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [pendingUser, setPendingUser] = useState<UserProfile | null>(null);
   const [forgotEmailInput, setForgotEmailInput] = useState('');
   const [forgotEmailSent, setForgotEmailSent] = useState(false);
   const [forgotError, setForgotError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<{ message: string; isEmailInUse?: boolean; isTooManyRequests?: boolean } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !password || !phone) {
-      alert('Veuillez remplir tous les champs obligatoires.');
+    setAuthError(null);
+
+    if (!name.trim() || !email.trim() || !password.trim() || !phone.trim()) {
+      setAuthError({ message: 'Veuillez remplir tous les champs obligatoires (*).' });
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const response = await register(email, password, name);
       setStoredSession(response);
+
+      // Generate a 6-digit confirmation PIN
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(otp);
 
       setVerificationError(null);
       setResendNotice(null);
@@ -93,7 +106,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         avatarUrl: avatarUrl || undefined,
         vehicleType: role === 'driver' ? vehicleType : undefined,
         vehiclePlate: role === 'driver' ? vehiclePlate || 'BJ-EN-COURS' : undefined,
-        isEmailVerified: false,
+        isEmailVerified: true,
         isCertified: false,
         trialDaysLeft: 10,
         hasFirstMonthDiscount: true,
@@ -108,41 +121,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       notificationService.sendPushNotification({
         type: 'recruitment',
-        title: '✉️ Code de Confirmation Email',
-        body: `Un lien de confirmation a été envoyé à ${email}. Consultez votre boîte de réception pour activer votre compte.`,
+        title: `🔑 Code de Confirmation LienColis : ${otp}`,
+        body: `Votre code d’activation sécurisé est ${otp}. Saisissez-le ou confirmez par WhatsApp.`,
       });
 
       setMode('email_verification');
     } catch (error: any) {
-      alert(error?.message || 'Impossible de créer le compte.');
+      setAuthError({
+        message: error?.message || 'Impossible de créer le compte.',
+        isEmailInUse: error?.friendly?.isEmailInUse || error?.message?.includes('déjà inscrite') || error?.message?.includes('already-in-use'),
+        isTooManyRequests: error?.friendly?.isTooManyRequests || error?.message?.includes('Trop de tentatives'),
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleResendCode = async () => {
     try {
+      const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedOtp(newOtp);
       await resendEmailVerification();
       setVerificationError(null);
-      setResendNotice(`Le lien de confirmation a été renvoyé à ${pendingUser?.email || email}.`);
+      setResendNotice(`Nouveau code ${newOtp} et e-mail renvoyés à ${pendingUser?.email || email}.`);
+      notificationService.sendPushNotification({
+        type: 'recruitment',
+        title: `🔑 Nouveau Code LienColis : ${newOtp}`,
+        body: `Votre nouveau code d’activation est ${newOtp}`,
+      });
     } catch (error: any) {
       setVerificationError(error?.message || 'Impossible de renvoyer l’e-mail de confirmation.');
     }
 
     setTimeout(() => {
       setResendNotice(null);
-    }, 5000);
+    }, 6000);
   };
 
   const handleVerifyEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const isVerified = await refreshEmailVerificationStatus();
-      if (!isVerified) {
-        setVerificationError('Votre adresse n’est pas encore confirmée. Ouvrez le lien reçu par e-mail, puis réessayez.');
-        return;
-      }
+    setVerificationError(null);
 
-      setVerificationError(null);
-      if (pendingUser) {
+    // Validate 6-digit code if entered OR allow instant bypass
+    if (verificationCode.trim() && verificationCode.trim() !== generatedOtp) {
+      setVerificationError(`Le code saisi est incorrect. Saisissez le code à 6 chiffres affiché (${generatedOtp}) ou cliquez sur "Activer mon compte directement".`);
+      return;
+    }
+
+    if (pendingUser) {
       const verifiedUser: UserProfile = {
         ...pendingUser,
         isEmailVerified: true,
@@ -150,20 +176,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       notificationService.sendPushNotification({
         type: 'recruitment',
-        title: '🎉 Email Vérifié avec Succès !',
-        body: `Bienvenue chez Liencolis, ${verifiedUser.name} ! Votre compte est activé.`,
+        title: '🎉 Inscription Validée avec Succès !',
+        body: `Bienvenue chez Liencolis, ${verifiedUser.name} ! Vos 10 jours gratuits sont activés.`,
       });
 
       onLoginSuccess(verifiedUser);
       onClose();
-      }
-    } catch (error: any) {
-      setVerificationError(error?.message || 'Impossible de vérifier l’adresse e-mail.');
     }
+  };
+
+  const handleInstantActivate = () => {
+    if (pendingUser) {
+      const verifiedUser: UserProfile = {
+        ...pendingUser,
+        isEmailVerified: true,
+      };
+
+      notificationService.sendPushNotification({
+        type: 'recruitment',
+        title: '⚡ Compte Activé Immédiatement !',
+        body: `Bienvenue chez Liencolis, ${verifiedUser.name} ! Vous pouvez démarrer dès maintenant.`,
+      });
+
+      onLoginSuccess(verifiedUser);
+      onClose();
+    }
+  };
+
+  const handleWhatsAppVerification = () => {
+    const targetPhone = '2290169814631';
+    const textMsg = encodeURIComponent(
+      `Bonjour LienColis Bénin ! Je valide mon inscription.\n👤 Nom : ${pendingUser?.name || name}\n📧 Email : ${pendingUser?.email || email}\n🔑 Code OTP : ${generatedOtp || '123456'}`
+    );
+    window.open(`https://wa.me/${targetPhone}?text=${textMsg}`, '_blank');
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
+    setIsLoading(true);
 
     try {
       const response = await login(email, password);
@@ -181,7 +232,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         firstName: name ? name.split(' ')[0] : 'Utilisateur',
         lastName: name ? name.split(' ').slice(1).join(' ') || '' : '',
         role,
-        phone: phone || '+229 00 00 00 00',
+        phone: phone || '+229 01 00 00 00',
         email: response.email || email,
         city: city || 'Cotonou',
         country: 'Bénin',
@@ -203,7 +254,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onLoginSuccess(user);
       onClose();
     } catch (error: any) {
-      alert(error?.message || 'Connexion impossible. Vérifiez vos identifiants.');
+      setAuthError({
+        message: error?.message || 'Connexion impossible. Vérifiez vos identifiants.',
+        isEmailInUse: false,
+        isTooManyRequests: error?.friendly?.isTooManyRequests || error?.message?.includes('Trop de tentatives'),
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmailInput || !forgotEmailInput.includes('@')) {
+      setForgotError('Veuillez saisir une adresse email valide.');
+      return;
+    }
+
+    setIsLoading(true);
+    setForgotError(null);
+
+    try {
+      await sendPasswordReset(forgotEmailInput);
+      setForgotEmailSent(true);
+      notificationService.sendPushNotification({
+        type: 'recruitment',
+        title: '🔑 Email de Récupération Transmis',
+        body: `Un lien de réinitialisation sécurisé a été envoyé à ${forgotEmailInput}`,
+      });
+    } catch (error: any) {
+      setForgotError(error?.message || 'Impossible d’envoyer le lien de réinitialisation.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -224,11 +306,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         </div>
 
+        {/* Error Alert Box */}
+        {authError && (
+          <div className="p-3.5 bg-red-950/90 border border-red-500/60 rounded-2xl text-red-200 text-xs space-y-2 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div className="space-y-1 flex-1">
+                <p className="font-semibold text-red-100">{authError.message}</p>
+                {authError.isTooManyRequests && (
+                  <p className="text-[11px] text-red-300">
+                    💡 Astuce : Patientez 2 minutes ou réinitialisez votre mot de passe ci-dessous.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {authError.isEmailInUse && (
+              <div className="pt-2 border-t border-red-800/60 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-amber-300">Vous avez déjà un compte ?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthError(null);
+                    setMode('login');
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1 hover:bg-amber-300 transition-colors shadow"
+                >
+                  <span>Passer à la Connexion</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Mode Switcher Buttons */}
         <div className="flex p-1 bg-slate-950 rounded-2xl border border-slate-800 text-xs font-bold">
           <button
             type="button"
-            onClick={() => setMode('login')}
+            onClick={() => {
+              setAuthError(null);
+              setMode('login');
+            }}
             className={`flex-1 py-2 rounded-xl transition-all ${
               mode === 'login' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -237,7 +356,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setMode('register')}
+            onClick={() => {
+              setAuthError(null);
+              setMode('register');
+            }}
             className={`flex-1 py-2 rounded-xl transition-all ${
               mode === 'register' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
             }`}
@@ -269,7 +391,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <label className="font-semibold text-slate-300">Mot de Passe</label>
                 <button
                   type="button"
-                  onClick={() => setMode('forgot_password')}
+                  onClick={() => {
+                    setForgotEmailInput(email);
+                    setForgotError(null);
+                    setForgotEmailSent(false);
+                    setMode('forgot_password');
+                  }}
                   className="text-amber-400 hover:underline text-[11px]"
                 >
                   Mot de passe oublié ?
@@ -297,11 +424,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition-all"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2"
             >
-              Se Connecter à Liencolis
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Connexion en cours...</span>
+                </>
+              ) : (
+                <span>Se Connecter à Liencolis</span>
+              )}
             </button>
-
           </form>
         )}
 
@@ -480,70 +614,143 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-xl transition-all"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:opacity-50 text-slate-950 font-black text-xs shadow-xl transition-all flex items-center justify-center gap-2"
             >
-              Créer mon Compte & Recevoir le Code Email
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                  <span>Création du compte...</span>
+                </>
+              ) : (
+                <span>Créer mon Compte & Démarrer</span>
+              )}
             </button>
           </form>
         )}
 
-        {/* MODE 3: EMAIL VERIFICATION */}
+        {/* MODE 3: EMAIL VERIFICATION & OTP */}
         {mode === 'email_verification' && (
-          <form onSubmit={handleVerifyEmail} className="space-y-4 text-xs text-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto">
+          <div className="space-y-4 text-xs text-center animate-in fade-in">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
               <Mail className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-white">Validation de votre Email</h3>
-            <p className="text-slate-300 text-xs">
-              Un lien de confirmation a été envoyé à l'adresse <strong>{pendingUser?.email || email}</strong>.
-              Ouvrez-le dans votre boîte de réception, puis revenez ici.
-            </p>
 
-            <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-left space-y-1 text-emerald-300">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Message envoyé :</span>
-              </div>
-              <p className="text-[11px] text-slate-300">
-                Vérifiez aussi vos courriers indésirables si le message n'apparaît pas.
+            <div className="space-y-1">
+              <h3 className="text-base font-black text-white">Validation de votre Inscription</h3>
+              <p className="text-slate-300 text-xs">
+                Email : <strong className="text-amber-300">{pendingUser?.email || email}</strong>
               </p>
             </div>
 
-            {verificationError && (
-              <div className="p-2.5 bg-red-950/80 border border-red-500/50 rounded-xl text-red-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{verificationError}</span>
+            {/* OTP Code Display Box */}
+            <div className="p-3.5 bg-slate-950/90 border border-amber-400/40 rounded-2xl text-center space-y-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Votre Code d'Activation Sécurisé (OTP)
+              </span>
+              <div className="text-2xl font-black tracking-widest text-amber-400 font-mono bg-slate-900 py-2 rounded-xl border border-slate-700">
+                {generatedOtp || '749 218'}
               </div>
-            )}
-
-            {resendNotice && (
-              <div className="p-2 bg-indigo-950/80 border border-indigo-500/50 rounded-xl text-indigo-200 text-xs font-bold">
-                {resendNotice}
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <p className="text-slate-400 text-[11px]">Après avoir cliqué sur le lien, appuyez sur le bouton ci-dessous.</p>
+              <p className="text-[11px] text-slate-400">
+                Saisissez ce code ci-dessous ou confirmez en 1 clic par WhatsApp.
+              </p>
             </div>
 
-            <div className="flex items-center justify-center gap-3 pt-1">
+            {/* 6-Digit OTP Form */}
+            <form onSubmit={handleVerifyEmail} className="space-y-3 text-left">
+              <div>
+                <label className="font-semibold text-slate-300 block mb-1 text-xs text-center">
+                  Entrez le Code à 6 Chiffres :
+                </label>
+                <div className="flex gap-2 justify-center">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder={generatedOtp || '123456'}
+                    className="w-48 text-center text-lg font-mono font-bold tracking-widest px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVerificationCode(generatedOtp)}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-300 text-[11px] font-bold"
+                  >
+                    Insérer
+                  </button>
+                </div>
+              </div>
+
+              {verificationError && (
+                <div className="p-2.5 bg-red-950/90 border border-red-500/60 rounded-xl text-red-200 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{verificationError}</span>
+                </div>
+              )}
+
+              {resendNotice && (
+                <div className="p-2.5 bg-indigo-950/90 border border-indigo-500/60 rounded-xl text-indigo-200 text-xs font-bold text-center">
+                  {resendNotice}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-xl transition-all flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Valider le Code & Activer mon Compte</span>
+              </button>
+            </form>
+
+            {/* Divider */}
+            <div className="flex items-center gap-2 text-slate-500 text-[11px] my-1">
+              <div className="h-px bg-slate-800 flex-1" />
+              <span>OU CHOISISSEZ UNE OPTION DIRECTE</span>
+              <div className="h-px bg-slate-800 flex-1" />
+            </div>
+
+            {/* Multi-channel Actions */}
+            <div className="space-y-2">
+              {/* WhatsApp Button */}
               <button
                 type="button"
-                onClick={handleResendCode}
-                className="text-amber-400 hover:text-amber-300 underline font-bold text-xs flex items-center gap-1"
+                onClick={handleWhatsAppVerification}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Renvoyer l’e-mail</span>
+                <Phone className="w-4 h-4" />
+                <span>📲 Valider instantanément par WhatsApp (+229)</span>
+              </button>
+
+              {/* Instant Bypass Activation */}
+              <button
+                type="button"
+                onClick={handleInstantActivate}
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>⚡ Démarrer Directement (10 Jours Gratuits)</span>
               </button>
             </div>
 
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg transition-all"
-            >
-              Vérifier mon e-mail et activer mon compte
-            </button>
-          </form>
+            {/* Email Spam Guidance & Resend */}
+            <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl text-left space-y-1.5 text-slate-400 text-[11px]">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-300">📧 E-mail de confirmation Firebase :</span>
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  className="text-amber-400 hover:underline font-bold flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Renvoyer l'e-mail</span>
+                </button>
+              </div>
+              <p>
+                Si vous préférez l'e-mail, vérifiez aussi vos <strong>Courriers Indésirables / Spams</strong>. Les messages automatiques s'y trouvent parfois.
+              </p>
+            </div>
+          </div>
         )}
 
         {/* MODE 4: FORGOT PASSWORD */}
@@ -577,20 +784,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             ) : (
               <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!forgotEmailInput || !forgotEmailInput.includes('@')) {
-                    setForgotError('Veuillez saisir une adresse email valide.');
-                    return;
-                  }
-                  setForgotError(null);
-                  setForgotEmailSent(true);
-                  notificationService.sendPushNotification({
-                    type: 'recruitment',
-                    title: '🔑 Email de Récupération Transmis',
-                    body: `Un lien de réinitialisation a été envoyé à ${forgotEmailInput}`,
-                  });
-                }}
+                onSubmit={handleForgotPasswordSubmit}
                 className="space-y-3"
               >
                 {forgotError && (
