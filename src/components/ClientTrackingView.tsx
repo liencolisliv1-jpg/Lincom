@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Delivery } from '../types';
 import { GoogleMapView } from './GoogleMapView';
-import { LeafletMapView } from './LeafletMapView';
+import { MapLibreView } from './MapLibreView';
 
 interface ClientTrackingViewProps {
   trackingCode: string;
@@ -40,7 +40,7 @@ export const ClientTrackingView: React.FC<ClientTrackingViewProps> = ({
   const [currentCode, setCurrentCode] = useState(trackingCode);
   const [searchInput, setSearchInput] = useState(trackingCode);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [activeMapTab, setActiveMapTab] = useState<'openstreetmap' | 'google_maps' | 'animated_radar'>('openstreetmap');
+  const [activeMapTab, setActiveMapTab] = useState<'maplibre' | 'google_maps' | 'animated_radar'>('maplibre');
 
   // Find delivery matching code or default to first
   const foundDelivery = deliveries.find(
@@ -295,16 +295,16 @@ export const ClientTrackingView: React.FC<ClientTrackingViewProps> = ({
             <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 p-1 rounded-xl">
               <button
                 type="button"
-                onClick={() => setActiveMapTab('openstreetmap')}
+                onClick={() => setActiveMapTab('maplibre')}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                  activeMapTab === 'openstreetmap'
+                  activeMapTab === 'maplibre'
                     ? 'bg-emerald-600 text-white shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="Carte OpenStreetMap 100% Gratuite"
+                title="Carte MapLibre GL WebGL (Rapide & Gratuite)"
               >
                 <MapPin className="w-3.5 h-3.5 text-emerald-300" />
-                <span>OpenStreetMap</span>
+                <span>MapLibre GL</span>
               </button>
               <button
                 type="button"
@@ -333,10 +333,10 @@ export const ClientTrackingView: React.FC<ClientTrackingViewProps> = ({
             </div>
           </div>
 
-          {activeMapTab === 'openstreetmap' ? (
-            /* OpenStreetMap Free Leaflet View */
+          {activeMapTab === 'maplibre' ? (
+            /* MapLibre GL Free WebGL View */
             <div className="w-full h-72 sm:h-96 relative">
-              <LeafletMapView
+              <MapLibreView
                 deliveries={deliveries}
                 selectedDeliveryId={delivery.id}
                 className="w-full h-full"

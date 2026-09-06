@@ -11,7 +11,7 @@ import { LiveTrackingModal } from './LiveTrackingModal';
 import { RouteOptimizerModal } from './RouteOptimizerModal';
 import { DailyDeliveryMidnightDigestModal } from './DailyDeliveryMidnightDigestModal';
 import { GoogleMapView } from './GoogleMapView';
-import { LeafletMapView } from './LeafletMapView';
+import { MapLibreView } from './MapLibreView';
 import {
   Navigation,
   MapPin,
@@ -144,7 +144,7 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
   const [showRouteOptimizerModal, setShowRouteOptimizerModal] = useState(false);
   const [showMidnightDigestModal, setShowMidnightDigestModal] = useState(false);
   const [showGmailModal, setShowGmailModal] = useState(false);
-  const [mapMode, setMapMode] = useState<'google_maps' | 'openstreetmap' | 'vector_radar'>('openstreetmap');
+  const [mapMode, setMapMode] = useState<'maplibre' | 'google_maps' | 'vector_radar'>('maplibre');
   const [ratingScore, setRatingScore] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [pinInput, setPinInput] = useState('');
@@ -809,17 +809,17 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
                   <div className="bg-slate-900 border border-slate-700 p-1 rounded-xl flex items-center gap-1 shadow-md">
                     <button
                       type="button"
-                      onClick={() => setMapMode('openstreetmap')}
+                      onClick={() => setMapMode('maplibre')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-                        mapMode === 'openstreetmap'
+                        mapMode === 'maplibre'
                           ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/30'
                           : 'text-slate-400 hover:text-white hover:bg-slate-800'
                       }`}
-                      id="toggle-mode-openstreetmap"
-                      title="Carte OpenStreetMap 100% Gratuite (Sans clé Google)"
+                      id="toggle-mode-maplibre"
+                      title="Carte MapLibre GL WebGL (Rapide, Fluide & Gratuite)"
                     >
                       <MapPin className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>OpenStreetMap (Gratuit)</span>
+                      <span>MapLibre GL</span>
                     </button>
 
                     <button
@@ -875,10 +875,10 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
                 </div>
               </div>
 
-              {/* Conditional Display: OpenStreetMap Leaflet, Google Maps, or Vector Simulation */}
-              {mapMode === 'openstreetmap' ? (
+              {/* Conditional Display: MapLibre GL, Google Maps, or Vector Simulation */}
+              {mapMode === 'maplibre' ? (
                 <div className="w-full h-[460px] sm:h-[540px] lg:h-[620px] relative">
-                  <LeafletMapView
+                  <MapLibreView
                     deliveries={deliveries}
                     selectedDeliveryId={selectedDelivery.id}
                     onSelectDelivery={(id) => setSelectedDeliveryId(id)}

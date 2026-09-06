@@ -102,6 +102,7 @@ export default function App() {
 
   // Subscribe to theme auto-detection & system preference changes
   useEffect(() => {
+    themeService.setMode('light');
     const unsubscribe = themeService.subscribe((status) => {
       setThemeStatus(status);
     });

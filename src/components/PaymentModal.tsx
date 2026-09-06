@@ -2,6 +2,16 @@ import React, { useState } from 'react';
 import { PaymentProvider, PaymentPurpose, PaymentTransaction, UserProfile } from '../types';
 import { notificationService } from '../services/notificationService';
 import {
+  FedaPayLogo,
+  KKiaPayLogo,
+  MtnMomoLogo,
+  MoovMoneyLogo,
+  CeltiisCashLogo,
+  VisaLogo,
+  MastercardLogo,
+  PaypalLogo,
+} from './PaymentLogos';
+import {
   CreditCard,
   Smartphone,
   Award,
@@ -643,30 +653,83 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             )}
 
-            {/* Provider Selection */}
+            {/* Provider Selection with Official Logos */}
             <div className="space-y-2">
-              <label className="font-bold text-slate-300 block">Moyen de Paiement Bénin</label>
-              <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
-                {[
-                  { id: 'fedapay', name: 'FedaPay Bénin (MTN/Moov/Celtiis/Carte)', logo: '🚀' },
-                  { id: 'kkiapay', name: 'Kkiapay Bénin (MTN/Moov/Celtiis/Carte)', logo: '⚡' },
-                  { id: 'bank_card', name: 'Carte Visa/Mastercard', logo: '💳' },
-                  { id: 'paypal', name: 'PayPal', logo: '🌐' },
-                ].map((prov) => (
-                  <button
-                    key={prov.id}
-                    type="button"
-                    onClick={() => setProvider(prov.id as PaymentProvider)}
-                    className={`p-2 rounded-xl text-center border transition-all ${
-                      provider === prov.id
-                        ? 'bg-blue-600/30 border-blue-400 text-white font-bold'
-                        : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
-                    }`}
-                  >
-                    <span className="text-base block">{prov.logo}</span>
-                    <span className="text-[11px]">{prov.name}</span>
-                  </button>
-                ))}
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-slate-300 block text-xs">Sélectionnez votre moyen de paiement :</label>
+                <span className="text-[10px] text-emerald-400 font-bold">100% Sécurisé Bénin & International</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {/* 1. FedaPay + GSM logos */}
+                <button
+                  type="button"
+                  onClick={() => setProvider('fedapay')}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all ${
+                    provider === 'fedapay'
+                      ? 'bg-blue-600/30 border-blue-400 ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/20'
+                      : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800 hover:border-slate-600'
+                  }`}
+                  title="FedaPay (MTN MoMo, Moov Money, Celtiis Cash)"
+                >
+                  <FedaPayLogo height={36} />
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <MtnMomoLogo height={18} />
+                    <MoovMoneyLogo height={18} />
+                    <CeltiisCashLogo height={18} />
+                  </div>
+                </button>
+
+                {/* 2. KKiaPay + GSM logos */}
+                <button
+                  type="button"
+                  onClick={() => setProvider('kkiapay')}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all ${
+                    provider === 'kkiapay'
+                      ? 'bg-amber-600/30 border-amber-400 ring-2 ring-amber-500/50 shadow-lg shadow-amber-500/20'
+                      : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800 hover:border-slate-600'
+                  }`}
+                  title="KKiaPay (MTN MoMo, Moov Money, Celtiis Cash)"
+                >
+                  <KKiaPayLogo height={36} />
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <MtnMomoLogo height={18} />
+                    <MoovMoneyLogo height={18} />
+                    <CeltiisCashLogo height={18} />
+                  </div>
+                </button>
+
+                {/* 3. Visa & MasterCard */}
+                <button
+                  type="button"
+                  onClick={() => setProvider('bank_card')}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all ${
+                    provider === 'bank_card'
+                      ? 'bg-indigo-600/30 border-indigo-400 ring-2 ring-indigo-500/50 shadow-lg shadow-indigo-500/20'
+                      : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800 hover:border-slate-600'
+                  }`}
+                  title="Cartes Bancaires Visa & MasterCard"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <VisaLogo height={26} />
+                    <MastercardLogo height={26} />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-300 font-mono tracking-wider">3D SECURE</span>
+                </button>
+
+                {/* 4. PayPal */}
+                <button
+                  type="button"
+                  onClick={() => setProvider('paypal')}
+                  className={`p-3 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all ${
+                    provider === 'paypal'
+                      ? 'bg-sky-600/30 border-sky-400 ring-2 ring-sky-500/50 shadow-lg shadow-sky-500/20'
+                      : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800 hover:border-slate-600'
+                  }`}
+                  title="PayPal International"
+                >
+                  <PaypalLogo height={34} />
+                  <span className="text-[10px] font-bold text-sky-400 font-mono tracking-wider">EXPRESS</span>
+                </button>
               </div>
             </div>
 

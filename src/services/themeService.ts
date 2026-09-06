@@ -39,12 +39,12 @@ class ThemeService {
   }
 
   public getSavedMode(): ThemeMode {
-    if (typeof localStorage === 'undefined') return 'auto';
+    if (typeof localStorage === 'undefined') return 'light';
     const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode;
     if (saved === 'dark' || saved === 'light' || saved === 'auto') {
       return saved;
     }
-    return 'auto';
+    return 'light';
   }
 
   public setMode(mode: ThemeMode): ThemeStatus {
