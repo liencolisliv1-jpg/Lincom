@@ -23,6 +23,7 @@ import {
 import { Delivery } from '../types';
 import { GoogleMapView } from './GoogleMapView';
 import { MapLibreView } from './MapLibreView';
+import { getPublicTrackingUrl } from '../utils/trackingUrl';
 
 interface ClientTrackingViewProps {
   trackingCode: string;
@@ -77,9 +78,7 @@ export const ClientTrackingView: React.FC<ClientTrackingViewProps> = ({
     createdAt: new Date().toISOString(),
   };
 
-  const trackingUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/?track=${encodeURIComponent(delivery.trackingCode)}`
-    : `https://liencolis.bj/?track=${delivery.trackingCode}`;
+  const trackingUrl = getPublicTrackingUrl(delivery.trackingCode);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(trackingUrl);

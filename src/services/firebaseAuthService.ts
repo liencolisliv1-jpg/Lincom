@@ -229,26 +229,82 @@ export const firebaseAuthService = {
     }
   },
 
-  // Login with Google (Direct & Seamless without triggering popup windows)
+  // Login with Google OAuth (Real Firebase popup with graceful fallback)
   async loginWithGoogle(options?: {
     role?: UserRole;
     phone?: string;
     city?: string;
     country?: string;
-    vehicleType?: string;
+    vehicleType?: any;
+    vehiclePlate?: string;
     fallbackEmail?: string;
     fallbackName?: string;
   }): Promise<UserProfile> {
-    const emailToUse = (options?.fallbackEmail || options?.fallbackName || 'germainmensah1@gmail.com').trim();
-    
-    // Direct seamless registration/login via Gmail without external popup windows
-    return this.registerDirectWithGmail(emailToUse, {
-      name: options?.fallbackName,
-      role: options?.role,
-      phone: options?.phone,
-      city: options?.city,
-      country: options?.country,
-    });
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+      provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+      provider.setCustomParameters({ prompt: 'select_account' });
+
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      let userProfile: UserProfile = {
+        id: user.uid,
+        name: user.displayName || options?.fallbackName || user.email?.split('@')[0] || 'Utilisateur Liencolis',
+        firstName: user.displayName?.split(' ')[0] || 'Utilisateur',
+        lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+        role: options?.role || 'driver',
+        phone: options?.phone || user.phoneNumber || '',
+        email: user.email || options?.fallbackEmail || '',
+        city: options?.city || 'Cotonou',
+        country: options?.country || 'Bénin',
+        avatarUrl: user.photoURL || undefined,
+        vehicleType: options?.role === 'driver' ? options?.vehicleType : undefined,
+        vehiclePlate: options?.role === 'driver' ? options?.vehiclePlate : undefined,
+        isEmailVerified: true,
+        isCertified: true,
+        trialDaysLeft: 10,
+        hasFirstMonthDiscount: true,
+        registeredOrder: 1,
+        rating: 5.0,
+        totalRatingsCount: 0,
+        completedDeliveries: 0,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Check / Sync with Firestore
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          userProfile = { ...userProfile, ...(snap.data() as UserProfile) };
+        } else {
+          setDoc(userRef, userProfile, { merge: true }).catch((e) => console.warn('Firestore Google user sync:', e));
+        }
+      } catch (dbErr) {
+        console.warn('Firestore Google fetch warning:', dbErr);
+      }
+
+      return userProfile;
+    } catch (err: any) {
+      console.warn('Google signInWithPopup error:', err);
+      const msg = err?.code || err?.message || '';
+
+      if (msg.includes('popup-closed-by-user')) {
+        throw new Error('Connexion Google annulée (fenêtre fermée).');
+      }
+
+      if (msg.includes('operation-not-allowed') || msg.includes('unauthorized-domain')) {
+        throw new Error(getFriendlyAuthErrorMessage(msg, 'google'));
+      }
+
+      if ((msg.includes('popup-blocked') || msg.includes('disallowed_useragent')) && (options?.fallbackEmail || options?.fallbackName)) {
+        return this.registerDirectWithGmail(options?.fallbackEmail || 'user@gmail.com', options);
+      }
+
+      throw new Error(getFriendlyAuthErrorMessage(msg, 'google'));
+    }
   },
 
   // Instant direct Gmail fallback (useful if popups or domains are restricted in preview)

@@ -198,10 +198,14 @@ export function generateGpsWhatsAppMessage(
 ): string {
   const mapLink = generateGpsShareLink(lat, lng, `Position Livreur ${driverName}`);
   const locationLabel = countryName ? `${cityName} (${countryName})` : cityName;
+  const trackingSection = trackingCode
+    ? `📦 Colis Suivi : #${trackingCode}\n🔗 Suivi en direct : https://lincom-1ecc6.web.app/?track=${encodeURIComponent(trackingCode)}\n`
+    : '';
+
   return `📍 *LIENCOLIS GPS - POSITION EN DIRECT*\n\n` +
     `👤 Livreur : ${driverName}\n` +
     `🏙️ Localisation : ${locationLabel}\n` +
-    (trackingCode ? `📦 Colis Suivi : ${trackingCode}\n` : '') +
+    trackingSection +
     `🌐 Coordonnées : ${lat.toFixed(5)}°, ${lng.toFixed(5)}°\n\n` +
     `👉 Suivre ma position GPS en direct sur Google Maps :\n${mapLink}`;
 }

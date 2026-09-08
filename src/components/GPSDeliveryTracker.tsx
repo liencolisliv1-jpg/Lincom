@@ -12,6 +12,7 @@ import { RouteOptimizerModal } from './RouteOptimizerModal';
 import { DailyDeliveryMidnightDigestModal } from './DailyDeliveryMidnightDigestModal';
 import { GoogleMapView } from './GoogleMapView';
 import { MapLibreView } from './MapLibreView';
+import { getPublicTrackingUrl } from '../utils/trackingUrl';
 import {
   Navigation,
   MapPin,
@@ -354,7 +355,11 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
     } else if (action === 'whatsapp_client') {
       voiceService.speak(`Ouverture du canal WhatsApp client.`);
       const cleanPhone = selectedDelivery.clientPhone.replace(/[^\d]/g, '');
-      const text = encodeURIComponent(`Bonjour ${selectedDelivery.clientPseudo}, votre livreur Liencolis est à proximité de votre adresse avec votre colis.`);
+      const trackingUrl = getPublicTrackingUrl(selectedDelivery.trackingCode);
+      const text = encodeURIComponent(
+        `Bonjour ${selectedDelivery.clientPseudo}, votre livreur Liencolis est à proximité de votre adresse avec votre colis.\n\n` +
+        `Suivi en direct : ${trackingUrl}\nCode : #${selectedDelivery.trackingCode}`
+      );
       window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
     } else if (action === 'report_incident') {
       voiceService.speak(`Incident enregistré. Veuillez rester prudent. Assistance commerciale avertie.`);

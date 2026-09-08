@@ -1,5 +1,6 @@
 import { AppNotification, NotificationSettings, NotificationType, PaymentPurpose, ClassifiedAd, Delivery } from '../types';
 import { firestoreService } from './firestoreService';
+import { getPublicTrackingUrl } from '../utils/trackingUrl';
 
 const STORAGE_KEYS = {
   NOTIFICATIONS: 'liencolis_notifications',
@@ -444,12 +445,14 @@ class NotificationService {
     }
 
     const pinNotice = delivery.securityPin ? `\n🔐 Code PIN de remise : *${delivery.securityPin}*` : '';
+    const trackingUrl = getPublicTrackingUrl(cleanTracking);
 
     return `📦 *LIENCOLIS EXPRESS - Mise à jour Course #${cleanTracking}*\n\n` +
       `Bonjour ! Votre colis (${delivery.packageDescription || 'Colis'}) ${statusText}.\n` +
       `👤 Livreur : ${courier}\n` +
       `📍 Destination : ${delivery.dropoffAddress} (${delivery.dropoffCity})\n` +
       `💰 Montant livraison : ${(delivery.deliveryFee || 0).toLocaleString('fr-FR')} FCFA${pinNotice}\n\n` +
+      `🔗 *Suivi en direct :*\n${trackingUrl}\n\n` +
       `Merci pour votre confiance sur le réseau des livreurs du Bénin 🇧🇯 !`;
   }
 

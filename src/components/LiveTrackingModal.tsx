@@ -19,6 +19,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { Delivery } from '../types';
+import { getPublicTrackingUrl } from '../utils/trackingUrl';
 
 interface LiveTrackingModalProps {
   isOpen: boolean;
@@ -35,9 +36,7 @@ export const LiveTrackingModal: React.FC<LiveTrackingModalProps> = ({
 
   if (!isOpen || !delivery) return null;
 
-  const trackingUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/?track=${encodeURIComponent(delivery.trackingCode)}`
-    : `https://ais-dev-zxavitnsxwmknftolyo2hv-626045602467.europe-west1.run.app/?track=${delivery.trackingCode}`;
+  const trackingUrl = getPublicTrackingUrl(delivery.trackingCode);
 
   const shareText = `Bonjour ! Suivez en direct la livraison de votre colis (${delivery.packageDescription}) par le livreur ${delivery.driverName || 'LIENCOLIS'} : ${trackingUrl} - Code de suivi : #${delivery.trackingCode}`;
 

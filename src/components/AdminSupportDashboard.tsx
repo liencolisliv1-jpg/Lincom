@@ -2052,18 +2052,18 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
                   Activez le mode de connexion pour permettre à vos livreurs et clients de créer des comptes et de se connecter en toute sécurité.
                 </p>
 
-                <div className="space-y-2 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
+                <div className="space-y-2.5 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
                   <div className="flex items-start gap-2 text-slate-300">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>1. Authentication :</strong> Ouvrir l'onglet <em>Mode de connexion (Sign-in method)</em> et activer <strong>Adresse e-mail/Mot de passe</strong> (+ Google si désiré).</span>
+                    <span><strong>1. Authentication :</strong> Activer <strong>Adresse e-mail/Mot de passe</strong> et <strong>Google (OAuth)</strong>.</span>
                   </div>
                   <div className="flex items-start gap-2 text-slate-300">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>2. Firestore Database :</strong> Base active sur <code>(default)</code>. Les règles de sécurité sont prêtes.</span>
+                    <span><strong>2. OAuth Manuel pour https://lincom-1ecc6.web.app :</strong> Configurer l'URI de redirection <code>https://lincom-1ecc6.firebaseapp.com/__/auth/handler</code> dans Google Cloud Credentials.</span>
                   </div>
                   <div className="flex items-start gap-2 text-slate-300">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>3. Configuration SMTP :</strong> Vérifiez le domaine de messagerie dans l'onglet <em>Contrôle SMTP & DNS</em> pour éviter les erreurs NXDOMAIN.</span>
+                    <span><strong>3. Firestore Database :</strong> Base active sur <code>(default)</code>. Les règles de sécurité sont déployées.</span>
                   </div>
                 </div>
               </div>
@@ -2076,12 +2076,21 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
                   className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow flex items-center gap-1.5 transition-all"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Activer Authentification Firebase</span>
+                  <span>Activer Google & Email sur Firebase</span>
+                </a>
+                <a
+                  href="https://console.cloud.google.com/apis/credentials?project=lincom-1ecc6"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow flex items-center gap-1.5 transition-all"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Google Cloud Credentials (OAuth)</span>
                 </a>
                 <button
                   type="button"
                   onClick={() => setActiveTab('smtp_settings')}
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow flex items-center gap-1.5 transition-all"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition-all"
                 >
                   <Mail className="w-3.5 h-3.5 text-amber-400" />
                   <span>Vérifier Domaine SMTP</span>
