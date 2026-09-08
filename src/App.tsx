@@ -777,6 +777,7 @@ export default function App() {
         initialMode={authMode}
         onClose={() => setAuthModalOpen(false)}
         onLoginSuccess={(user) => {
+          storageService.setUser(user);
           setCurrentUser(user);
           setAuthModalOpen(false);
         }}

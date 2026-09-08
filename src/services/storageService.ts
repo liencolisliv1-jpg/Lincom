@@ -615,8 +615,27 @@ class StorageService {
     return null;
   }
 
+  public getAllUsers(): UserProfile[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.ALL_USERS);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   public setUser(user: UserProfile): void {
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+    try {
+      const all = this.getAllUsers();
+      const idx = all.findIndex((u) => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
+      if (idx >= 0) {
+        all[idx] = user;
+      } else {
+        all.push(user);
+      }
+      localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(all));
+    } catch {}
   }
 
   public isDriverMuted(user?: UserProfile | null): boolean {

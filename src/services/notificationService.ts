@@ -4,6 +4,7 @@ import { firestoreService } from './firestoreService';
 const STORAGE_KEYS = {
   NOTIFICATIONS: 'liencolis_notifications',
   SETTINGS: 'liencolis_notification_settings',
+  DISMISSED_IDS: 'liencolis_dismissed_notification_ids',
 };
 
 const DEFAULT_SETTINGS: NotificationSettings = {
@@ -131,18 +132,40 @@ class NotificationService {
     };
   }
 
+  public getDismissedIds(): Set<string> {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.DISMISSED_IDS);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  }
+
+  public addDismissedId(id: string): void {
+    const ids = this.getDismissedIds();
+    ids.add(id);
+    localStorage.setItem(STORAGE_KEYS.DISMISSED_IDS, JSON.stringify(Array.from(ids)));
+  }
+
   public getNotifications(): AppNotification[] {
+    const dismissed = this.getDismissedIds();
     try {
       const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
       if (data !== null) {
         const parsed = JSON.parse(data);
         if (Array.isArray(parsed)) {
-          return parsed.map((item) => this.sanitizeNotification(item));
+          return parsed
+            .filter((item) => !dismissed.has(item.id))
+            .map((item) => this.sanitizeNotification(item));
         }
       }
-      return DEFAULT_NOTIFICATIONS.map((item) => this.sanitizeNotification(item));
+      return DEFAULT_NOTIFICATIONS
+        .filter((item) => !dismissed.has(item.id))
+        .map((item) => this.sanitizeNotification(item));
     } catch {
-      return DEFAULT_NOTIFICATIONS.map((item) => this.sanitizeNotification(item));
+      return DEFAULT_NOTIFICATIONS
+        .filter((item) => !dismissed.has(item.id))
+        .map((item) => this.sanitizeNotification(item));
     }
   }
 
@@ -161,16 +184,20 @@ class NotificationService {
   }
 
   public clearAll(): void {
+    const current = this.getNotifications();
+    current.forEach((n) => this.addDismissedId(n.id));
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
   }
 
   public resetToDefaults(): void {
+    localStorage.removeItem(STORAGE_KEYS.DISMISSED_IDS);
     const sanitizedDefaults = DEFAULT_NOTIFICATIONS.map((item) => this.sanitizeNotification(item));
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(sanitizedDefaults));
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(DEFAULT_SETTINGS));
   }
 
   public deleteNotification(id: string): void {
+    this.addDismissedId(id);
     const list = this.getNotifications().filter((n) => n.id !== id);
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(list));
   }

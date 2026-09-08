@@ -4,6 +4,7 @@ import { BENIN_CITY_NAMES } from '../constants/beninCities';
 import { LiencolisLogo } from './LiencolisLogo';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { notificationService } from '../services/notificationService';
+import { emailService } from '../services/emailService';
 import { login, refreshEmailVerificationStatus, register, resendEmailVerification, sendPasswordReset, setStoredSession } from '../services/authService';
 import { storageService } from '../services/storageService';
 import {
@@ -63,6 +64,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
   const [pendingUser, setPendingUser] = useState<UserProfile | null>(null);
+  const [emailDispatchStatus, setEmailDispatchStatus] = useState<{ sent: boolean; message?: string; isBadCredentials?: boolean } | null>(null);
   const [forgotEmailInput, setForgotEmailInput] = useState('');
   const [forgotEmailSent, setForgotEmailSent] = useState(false);
   const [forgotError, setForgotError] = useState<string | null>(null);
@@ -118,14 +120,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       };
 
       setPendingUser(newUser);
+      storageService.setUser(newUser);
 
       notificationService.sendPushNotification({
         type: 'recruitment',
-        title: `🔑 Code de Confirmation LienColis : ${otp}`,
-        body: `Votre code d’activation sécurisé est ${otp}. Saisissez-le ou confirmez par WhatsApp.`,
+        title: `🎉 Bienvenue chez LienColis, ${newUser.firstName || newUser.name} !`,
+        body: `Votre compte est activé avec succès. Vos 10 jours d'essai gratuit sont démarrés !`,
       });
 
-      setMode('email_verification');
+      // Non-blocking background email dispatch
+      emailService.sendVerificationEmail({
+        email: response.email || email,
+        name,
+        code: otp,
+        role,
+      }).catch(() => {});
+
+      // Immediately log the user into the platform - zero blockage
+      onLoginSuccess(newUser);
+      onClose();
     } catch (error: any) {
       setAuthError({
         message: error?.message || 'Impossible de créer le compte.',
@@ -142,8 +155,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(newOtp);
       await resendEmailVerification();
+
+      emailService.sendVerificationEmail({
+        email: pendingUser?.email || email,
+        name: pendingUser?.name || name,
+        code: newOtp,
+        role: pendingUser?.role || role,
+      }).then((res) => {
+        if (res.isBadCredentials) {
+          setEmailDispatchStatus({
+            sent: false,
+            isBadCredentials: true,
+            message: "Google SMTP : Mot de passe d'application requis.",
+          });
+        }
+      }).catch(() => {});
+
       setVerificationError(null);
-      setResendNotice(`Nouveau code ${newOtp} et e-mail renvoyés à ${pendingUser?.email || email}.`);
+      setResendNotice(`Nouveau code ${newOtp} généré pour ${pendingUser?.email || email}.`);
       notificationService.sendPushNotification({
         type: 'recruitment',
         title: `🔑 Nouveau Code LienColis : ${newOtp}`,
@@ -222,6 +251,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (savedUser && savedUser.email.toLowerCase() === email.toLowerCase()) {
         setStoredSession(response);
         onLoginSuccess(savedUser);
+        onClose();
+        return;
+      }
+
+      const allUsers = storageService.getAllUsers();
+      const existingUser = allUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
+      if (existingUser) {
+        storageService.setUser(existingUser);
+        setStoredSession(response);
+        onLoginSuccess(existingUser);
         onClose();
         return;
       }
@@ -733,22 +772,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </button>
             </div>
 
-            {/* Email Spam Guidance & Resend */}
-            <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl text-left space-y-1.5 text-slate-400 text-[11px]">
+            {/* Status of email dispatch */}
+            {emailDispatchStatus && (
+              <div className={`p-3 rounded-xl text-left text-xs border ${
+                emailDispatchStatus.sent
+                  ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-200'
+                  : 'bg-amber-950/70 border-amber-500/40 text-amber-200'
+              }`}>
+                <div className="flex items-start gap-2">
+                  <Mail className={`w-4 h-4 shrink-0 mt-0.5 ${emailDispatchStatus.sent ? 'text-emerald-400' : 'text-amber-400'}`} />
+                  <div>
+                    <span className="font-bold block">
+                      {emailDispatchStatus.sent ? 'E-mail envoyé vers Gmail' : 'Information sur la réception Gmail'}
+                    </span>
+                    <p className="text-[11px] mt-0.5 opacity-90 leading-relaxed">
+                      {emailDispatchStatus.message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Email Spam & Delivery Guidance */}
+            <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl text-left space-y-2 text-slate-300 text-[11px]">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-300">📧 E-mail de confirmation Firebase :</span>
+                <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Pourquoi l'e-mail tarde ou n'apparaît pas ?</span>
+                </span>
                 <button
                   type="button"
                   onClick={handleResendCode}
-                  className="text-amber-400 hover:underline font-bold flex items-center gap-1"
+                  className="text-amber-400 hover:underline font-bold flex items-center gap-1 text-[11px]"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span>Renvoyer l'e-mail</span>
                 </button>
               </div>
-              <p>
-                Si vous préférez l'e-mail, vérifiez aussi vos <strong>Courriers Indésirables / Spams</strong>. Les messages automatiques s'y trouvent parfois.
-              </p>
+              <ul className="list-disc pl-4 space-y-1 text-slate-400 text-[11px] leading-relaxed">
+                <li>
+                  <strong className="text-slate-200">Dossiers Spams ou Promotions :</strong> Gmail classe fréquemment les courriels automatiques d'inscription dans l'onglet <em>Spams / Pourriels</em> ou <em>Promotions</em>.
+                </li>
+                <li>
+                  <strong className="text-slate-200">Aucune attente nécessaire :</strong> Votre code à 6 chiffres (<span className="text-amber-300 font-mono font-bold">{generatedOtp}</span>) est généré en direct à l'écran. Vous pouvez cliquer sur <strong>« Insérer »</strong> ou <strong>« Valider le Code »</strong> sans attendre !
+                </li>
+              </ul>
             </div>
           </div>
         )}

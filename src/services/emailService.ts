@@ -16,6 +16,8 @@ export interface EmailDispatchResult {
   message?: string;
   previewUrl?: string | null;
   error?: string;
+  smtpWarning?: string | null;
+  isBadCredentials?: boolean;
 }
 
 class EmailService {
@@ -48,12 +50,14 @@ class EmailService {
         success: true,
         message: data.message || 'Email de confirmation envoyé',
         previewUrl: data.previewUrl || null,
+        smtpWarning: data.smtpWarning || null,
+        isBadCredentials: data.isBadCredentials || false,
       };
     } catch (error: any) {
       console.warn('[EmailService] Échec envoi serveur, basculement en mode local:', error);
       return {
         success: true, // Graceful fallback
-        message: 'Code généré avec succès (Simulation sécurisée)',
+        message: 'Code généré avec succès (affiché à l\'écran)',
         previewUrl: null,
       };
     }
