@@ -90,6 +90,28 @@ export default function App() {
     setTriggerNewDeliveryModal((prev) => prev + 1);
   };
 
+  // Initial reset to default state as requested by user ("Amène tout l'App à par défaut")
+  useEffect(() => {
+    const RESET_FLAG = 'liencolis_app_default_reset_executed_v2026';
+    if (!localStorage.getItem(RESET_FLAG)) {
+      localStorage.setItem(RESET_FLAG, 'true');
+      storageService.resetAllToDefaults();
+      notificationService.resetToDefaults();
+      themeService.setMode('light');
+      setDeliveries(storageService.getDeliveries());
+      setMessages(storageService.getMessages());
+      setAds(storageService.getAds());
+      setMarketplace(storageService.getMarketplace());
+      setRentals(storageService.getRentals());
+      setAidRequests(storageService.getAidRequests());
+      setAdminSummaries([]);
+      setCurrentUser(null);
+      setCurrentTab('deliveries');
+      setUpdates(notificationService.getNotifications());
+      setPushUnreadCount(notificationService.getUnreadCount());
+    }
+  }, []);
+
   useEffect(() => {
     const savedSession = getStoredSession();
     if (savedSession && !currentUser) {
@@ -326,6 +348,29 @@ export default function App() {
     alert('Votre compte et vos données ont été définitivement supprimés.');
   };
 
+  const handleResetAppToDefaults = () => {
+    storageService.resetAllToDefaults();
+    notificationService.resetToDefaults();
+    themeService.setMode('light');
+
+    setDeliveries(storageService.getDeliveries());
+    setMessages(storageService.getMessages());
+    setAds(storageService.getAds());
+    setMarketplace(storageService.getMarketplace());
+    setRentals(storageService.getRentals());
+    setAidRequests(storageService.getAidRequests());
+    setAdminSummaries([]);
+    setCurrentUser(null);
+    setCurrentTab('deliveries');
+    setLanguage('fr');
+    setSearchQuery('');
+    setActiveTrackingCode(null);
+    setUpdates(notificationService.getNotifications());
+    setPushUnreadCount(notificationService.getUnreadCount());
+
+    alert('Toute l\'application Liencolis a été remise à son état d\'origine par défaut.');
+  };
+
   const handleLogout = async () => {
     await logoutUser();
     storageService.deleteAccount();
@@ -397,6 +442,7 @@ export default function App() {
         offlineState={offlineState}
         onOpenOfflineModal={() => setOfflineModalOpen(true)}
         onOpenPermissions={() => setPermissionsModalOpen(true)}
+        onResetToDefaults={handleResetAppToDefaults}
       />
 
       {/* Real-time Offline Status & Sync Banner */}
@@ -420,6 +466,11 @@ export default function App() {
           } else {
             setNotificationCenterOpen(true);
           }
+        }}
+        onDismissNotification={(id) => {
+          notificationService.deleteNotification(id);
+          setUpdates(notificationService.getNotifications());
+          setPushUnreadCount(notificationService.getUnreadCount());
         }}
         isDarkMode={isDarkMode}
       />
@@ -447,6 +498,7 @@ export default function App() {
       {/* Hero Atmosphere Header on Home / Deliveries tab */}
       {currentTab === 'deliveries' && (
         <HomeHero
+          currentUser={currentUser}
           onOpenNewDelivery={handleOpenNewDelivery}
           onOpenAuth={(mode = 'register') => {
             setAuthMode(mode);
@@ -464,6 +516,38 @@ export default function App() {
             }
           }}
         />
+      )}
+
+      {/* Top Auth Bar for other tabs when unauthenticated */}
+      {!currentUser && currentTab !== 'deliveries' && (
+        <div className="bg-slate-900/95 border-b border-slate-800 py-2.5 px-4 shadow-sm">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-slate-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>Rejoignez <strong>liencolis (driver and communauty)</strong> pour participer, publier ou réserver des courses.</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setAuthMode('login');
+                  setAuthModalOpen(true);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs shadow-sm transition-all"
+              >
+                Connexion
+              </button>
+              <button
+                onClick={() => {
+                  setAuthMode('register');
+                  setAuthModalOpen(true);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all"
+              >
+                Inscription
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Main Dynamic View Content */}
@@ -717,6 +801,7 @@ export default function App() {
           setCurrentUser(updated);
         }}
         onDeleteAccount={handleDeleteAccount}
+        onResetToDefaults={handleResetAppToDefaults}
         onOpenPayment={(purpose) => {
           setProfileModalOpen(false);
           openPaymentWithPurpose(purpose || 'wallet_deposit_1200');

@@ -35,6 +35,7 @@ import {
   Database,
   Clock,
   Mail,
+  RotateCcw,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -63,6 +64,7 @@ interface NavbarProps {
   offlineState?: OfflineSyncState;
   onOpenOfflineModal?: () => void;
   onOpenPermissions?: () => void;
+  onResetToDefaults?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -91,6 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   offlineState,
   onOpenOfflineModal,
   onOpenPermissions,
+  onResetToDefaults,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
@@ -589,6 +592,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <div className="border-t border-slate-800 my-1"></div>
 
+                    {onResetToDefaults && (
+                      <button
+                        onClick={() => {
+                          if (confirm('Voulez-vous remettre toute l\'application Liencolis à ses valeurs et données par défaut ?')) {
+                            onResetToDefaults();
+                            setIsUserMenuOpen(false);
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-amber-400 hover:bg-amber-500/10 flex items-center gap-2 font-medium"
+                      >
+                        <RotateCcw className="w-4 h-4 text-amber-400" />
+                        <span>Réinitialiser par défaut</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => {
                         onLogout();
@@ -602,22 +620,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onOpenAuth('login')}
-                  className="text-xs text-slate-300 hover:text-white px-3 py-1.5 font-medium transition-colors"
-                >
-                  Connexion
-                </button>
-                <button
-                  onClick={() => onOpenAuth('register')}
-                  className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold px-3.5 py-1.5 rounded-lg shadow-md transition-colors"
-                >
-                  Inscription
-                </button>
-              </div>
-            )}
+            ) : null}
 
             {/* Quick Dark/Light/Auto Theme Toggle for Mobile Header */}
             <button
@@ -874,6 +877,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               ))}
             </div>
+
+            {onResetToDefaults && (
+              <button
+                onClick={() => {
+                  if (confirm('Voulez-vous remettre toute l\'application Liencolis à ses valeurs et données par défaut ?')) {
+                    onResetToDefaults();
+                    setIsMobileMenuOpen(false);
+                  }
+                }}
+                className="p-2 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold flex items-center gap-1 border border-slate-700 hover:bg-slate-700 transition-colors"
+                title="Remettre l'application par défaut"
+              >
+                <RotateCcw className="w-4 h-4 text-amber-400" />
+                <span className="text-[11px]">Par défaut</span>
+              </button>
+            )}
 
             <button
               onClick={() => {

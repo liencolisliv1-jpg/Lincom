@@ -421,7 +421,7 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
     notificationService.sendPushNotification({
       type: 'aid_approved',
       title: `💰 VIREMENT MOBILE MONEY EFFECTUÉ (${req.requestedAmount.toLocaleString()} FCFA)`,
-      body: `Paiement de ${req.requestedAmount.toLocaleString()} FCFA transféré instantanément vers votre numéro ${req.driverPhone}. Réf: ${refCode}.`,
+      body: `Un utilisateur a reçu un virement d'assistance de ${req.requestedAmount.toLocaleString()} FCFA avec succès. Réf: ${refCode}.`,
     });
     notificationService.speak(`Virement de ${req.requestedAmount} Francs CFA versé avec succès à ${req.driverName}.`);
   };
@@ -2100,12 +2100,12 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
                     <h4 className="text-base font-black text-white">Domaine & Déploiement Web</h4>
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    liencolisdrivercom.com
+                    lincom-1ecc6.web.app
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Votre nom de projet est <strong>liencolis (driver and communauty)</strong> et votre domaine d'accès officiel configuré est <strong>liencolisdrivercom.com</strong>.
+                  Votre nom de projet est <strong>liencolis (driver and communauty)</strong> et votre domaine d'accès officiel configuré est <strong>lincom-1ecc6.web.app</strong>.
                 </p>
 
                 <div className="space-y-2 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
@@ -2132,16 +2132,16 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
 
               <div className="pt-3 border-t border-slate-800 flex flex-wrap gap-2">
                 <a
-                  href="https://liencolisdrivercom.com"
+                  href="https://lincom-1ecc6.web.app"
                   target="_blank"
                   rel="noreferrer"
                   className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black shadow flex items-center gap-1.5 transition-all"
                 >
                   <Globe className="w-3.5 h-3.5" />
-                  <span>Ouvrir liencolisdrivercom.com</span>
+                  <span>Ouvrir lincom-1ecc6.web.app</span>
                 </a>
                 <a
-                  href="https://liencolisdriver-communauty.web.app"
+                  href="https://lincom-1ecc6.firebaseapp.com"
                   target="_blank"
                   rel="noreferrer"
                   className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition-all"

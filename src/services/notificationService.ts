@@ -20,8 +20,8 @@ const DEFAULT_NOTIFICATIONS: AppNotification[] = [
   {
     id: 'notif_01',
     type: 'recruitment',
-    title: '📢 Recrutement Urgent Livreur (Cotonou)',
-    body: 'Le Restaurant Le Privilège (Haie Vive) recherche 3 livreurs 2-roues pour tournées midi/soir. Rémunération : 140 000 FCFA/mois + primes de course.',
+    title: '📢 Recrutement Livreur (Cotonou)',
+    body: 'Un utilisateur a publié une annonce de recrutement pour des tournées et livraisons. Rendez-vous dans les annonces pour postuler.',
     timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
     isRead: false,
     city: 'Cotonou',
@@ -32,7 +32,7 @@ const DEFAULT_NOTIFICATIONS: AppNotification[] = [
     id: 'notif_02',
     type: 'badge_expiration',
     title: '⭐ Rappel Expiration Badge VIP 500 FCFA',
-    body: 'Votre étoile dorée et votre profil épinglé en tête de liste dans les salons expirent dans 24h. Renouvelez votre abonnement hebdomadaire pour conserver la priorité.',
+    body: 'Un utilisateur a renouvelé son profil prioritaire. Pensez à renouveler votre badge pour conserver vos courses prioritaires.',
     timestamp: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
     isRead: false,
     city: 'Cotonou',
@@ -43,7 +43,7 @@ const DEFAULT_NOTIFICATIONS: AppNotification[] = [
     id: 'notif_03',
     type: 'urgent_delivery',
     title: '⚡ Relais Colis Urgent (Abomey-Calavi)',
-    body: 'Colis fragile en attente de prise en charge à Kpota vers Zogbadjè. Tarif garanti : 2 500 FCFA.',
+    body: 'Un utilisateur a créé une nouvelle demande de livraison urgente. Tarif garanti : 2 500 FCFA. Cliquez pour accepter la course.',
     timestamp: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
     isRead: true,
     city: 'Abomey-Calavi',
@@ -63,8 +63,19 @@ class NotificationService {
   }
 
   private initStorage() {
-    if (!localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)) {
+    const existing = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    if (!existing) {
       localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(DEFAULT_NOTIFICATIONS));
+    } else {
+      try {
+        const parsed: AppNotification[] = JSON.parse(existing);
+        if (Array.isArray(parsed)) {
+          const sanitized = parsed.map((item) => this.sanitizeNotification(item));
+          localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(sanitized));
+        }
+      } catch {
+        localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(DEFAULT_NOTIFICATIONS));
+      }
     }
     if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(DEFAULT_SETTINGS));
@@ -87,12 +98,51 @@ class NotificationService {
     return updated;
   }
 
+  /**
+   * Enforces privacy by anonymizing client and user personal information in notifications.
+   * Ensures that no phone numbers, email addresses, or personal contact details are exposed,
+   * keeping the message neutral ("Un utilisateur a...").
+   */
+  public sanitizeNotification(notification: AppNotification): AppNotification {
+    let { title, body } = notification;
+
+    // Check for specific legacy default notifications
+    if (body.includes('Restaurant Le Privilège') || notification.id === 'notif_01') {
+      title = '📢 Recrutement Livreur (Cotonou)';
+      body = 'Un utilisateur a publié une annonce de recrutement pour des tournées et livraisons. Rendez-vous dans les annonces pour postuler.';
+    } else if (body.includes('Colis fragile en attente') || notification.id === 'notif_03') {
+      title = '⚡ Relais Colis Urgent (Abomey-Calavi)';
+      body = 'Un utilisateur a créé une nouvelle demande de livraison urgente. Tarif garanti : 2 500 FCFA. Cliquez pour accepter la course.';
+    } else {
+      // Strip any raw phone numbers
+      body = body.replace(/(?:\+229[\s.-]?)?(?:01[\s.-]?)?[4569]\d(?:[\s.-]?\d{2}){3}/g, '');
+      body = body.replace(/\bContact\s*:\s*/gi, '');
+      body = body.replace(/\bTéléphone\s*:\s*/gi, '');
+      body = body.replace(/\bTél\s*:\s*/gi, '');
+      // Strip emails
+      body = body.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '');
+      body = body.replace(/\s{2,}/g, ' ').replace(/\s*,\s*$/, '').trim();
+    }
+
+    return {
+      ...notification,
+      title,
+      body,
+    };
+  }
+
   public getNotifications(): AppNotification[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
-      return data ? JSON.parse(data) : DEFAULT_NOTIFICATIONS;
+      if (data !== null) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => this.sanitizeNotification(item));
+        }
+      }
+      return DEFAULT_NOTIFICATIONS.map((item) => this.sanitizeNotification(item));
     } catch {
-      return DEFAULT_NOTIFICATIONS;
+      return DEFAULT_NOTIFICATIONS.map((item) => this.sanitizeNotification(item));
     }
   }
 
@@ -112,6 +162,17 @@ class NotificationService {
 
   public clearAll(): void {
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+  }
+
+  public resetToDefaults(): void {
+    const sanitizedDefaults = DEFAULT_NOTIFICATIONS.map((item) => this.sanitizeNotification(item));
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(sanitizedDefaults));
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(DEFAULT_SETTINGS));
+  }
+
+  public deleteNotification(id: string): void {
+    const list = this.getNotifications().filter((n) => n.id !== id);
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(list));
   }
 
   public subscribe(listener: NotificationListener): () => void {
@@ -237,12 +298,15 @@ class NotificationService {
     if (notificationData.type === 'urgent_delivery' && !settings.urgentDeliveryAlerts) return null as any;
     if (notificationData.type === 'aid_fund' && !settings.aidFundAlerts) return null as any;
 
-    const fullNotification: AppNotification = {
+    const rawNotification: AppNotification = {
       ...notificationData,
       id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       timestamp: new Date().toISOString(),
       isRead: false,
     };
+
+    // Automatically sanitize and mask any customer private details
+    const fullNotification = this.sanitizeNotification(rawNotification);
 
     // Save to local storage
     const list = this.getNotifications();
@@ -291,17 +355,17 @@ class NotificationService {
   }
 
   /**
-   * Dispatches an alert when a new recruitment ad is posted
+   * Dispatches an alert when a new recruitment ad is posted (anonymized, no customer details)
    */
   public notifyNewRecruitmentAd(ad: ClassifiedAd): void {
     this.sendPushNotification({
       type: 'recruitment',
-      title: `📢 Offre de Recrutement : ${ad.title}`,
-      body: `${ad.authorName} recrute des livreurs à ${ad.city} : "${ad.description.slice(0, 100)}..." Contact : ${ad.phone}`,
+      title: `📢 Opportunité de Mission (${ad.city})`,
+      body: `Un utilisateur a publié une annonce pour des livreurs à ${ad.city}. Ouvrez l'application pour consulter les détails et postuler.`,
       city: ad.city,
       targetTab: 'classifieds',
-      actionLabel: 'Postuler / Contacter',
-      metadata: { adId: ad.id, phone: ad.phone },
+      actionLabel: 'Voir l\'offre',
+      metadata: { adId: ad.id },
     });
   }
 
@@ -314,8 +378,8 @@ class NotificationService {
       type: 'badge_expiration',
       title: isExpired ? '⭐ Badge VIP Expiré !' : `⭐ Rappel Expiration Badge VIP (${hoursRemaining}h restantes)`,
       body: isExpired
-        ? `${driverName}, votre étoile dorée a expiré. Votre profil n'est plus épinglé en tête de liste. Renouvelez pour 500 FCFA/semaine.`
-        : `${driverName}, votre badge VIP et votre épinglage en tête de liste expirent dans ${hoursRemaining}h. Renouvelez pour 500 FCFA/semaine pour maintenir vos courses prioritaires.`,
+        ? `Votre étoile dorée a expiré. Renouvelez pour 500 FCFA/semaine pour conserver la priorité sur vos courses.`
+        : `Votre badge VIP expire dans ${hoursRemaining}h. Renouvelez pour 500 FCFA/semaine pour maintenir vos courses prioritaires.`,
       actionPurpose: 'premium_badge_week',
       actionLabel: 'Renouveler pour 500 FCFA',
       metadata: { hoursRemaining },
@@ -323,13 +387,13 @@ class NotificationService {
   }
 
   /**
-   * Dispatches an alert for urgent order
+   * Dispatches an alert for urgent order (anonymized, no customer private details)
    */
   public notifyUrgentDelivery(title: string, city: string, priceFcfa: number): void {
     this.sendPushNotification({
       type: 'urgent_delivery',
       title: `⚡ Course Urgente Disponible (${city})`,
-      body: `${title} • Tarif immédiat garanti : ${priceFcfa.toLocaleString('fr-FR')} FCFA. Cliquez pour accepter la course.`,
+      body: `Un utilisateur a créé une nouvelle demande de livraison (${priceFcfa.toLocaleString('fr-FR')} FCFA). Cliquez pour accepter la course.`,
       city: city,
       targetTab: 'classifieds',
       actionLabel: 'Prendre la course',
@@ -385,21 +449,21 @@ class NotificationService {
   }
 
   /**
-   * Notifies when a delivery changes status (Web Push + Voice synthesizer)
+   * Notifies when a delivery changes status (anonymized, no customer details)
    */
   public notifyDeliveryStatusChange(delivery: Delivery, driverName?: string): void {
     const tracking = delivery.trackingCode || delivery.id.slice(0, 6);
     let title = `📦 Course #${tracking}`;
-    let body = `Mise à jour du statut : ${delivery.status}`;
+    let body = `Un utilisateur a mis à jour le statut d'une livraison.`;
 
     if (delivery.status === 'in_transit') {
-      title = `🚴 Colis #${tracking} En Route !`;
-      body = `Le coursier ${driverName || delivery.driverName || ''} est en chemin vers ${delivery.dropoffAddress} (${delivery.dropoffCity}).`;
+      title = `🚴 Colis #${tracking} En Route`;
+      body = `Un utilisateur a pris en charge le colis. La course est actuellement en chemin vers ${delivery.dropoffCity}.`;
       this.speak(`Course ${tracking} en route vers la destination.`);
     } else if (delivery.status === 'delivered') {
-      title = `✅ Colis #${tracking} Livré !`;
-      body = `La livraison à ${delivery.dropoffAddress} a été validée avec succès avec le code PIN sécurisé.`;
-      this.speak(`Colis ${tracking} livré avec succès. Bravo.`);
+      title = `✅ Colis #${tracking} Livré`;
+      body = `Un utilisateur a validé la réception du colis avec succès.`;
+      this.speak(`Colis ${tracking} livré avec succès.`);
     }
 
     this.sendPushNotification({

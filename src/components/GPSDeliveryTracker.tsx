@@ -567,7 +567,7 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
     notificationService.sendPushNotification({
       type: 'aid_approved',
       title: '🔓 SÉQUESTRE LEVÉ : RETRAITS DÉBLOQUÉS',
-      body: `Colis #${selectedDelivery.trackingCode} validé par le client avec succès ! Votre accès au retrait et retour de dépôt est réactivé.`,
+      body: `Un utilisateur a validé la réception du colis avec succès ! Votre accès au retrait et retour de dépôt est réactivé.`,
     });
 
     onUpdateDelivery(updated);

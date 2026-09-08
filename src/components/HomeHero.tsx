@@ -6,7 +6,7 @@ import heroDriverImg from '../assets/images/hero_driver_benin_1788086400357.jpg'
 import communityCourierImg from '../assets/images/community_courier_benin_1788441002237.jpg';
 import driversSolidarityImg from '../assets/images/drivers_solidarity_benin_1788441020195.jpg';
 import relayDispatchImg from '../assets/images/relay_dispatch_benin_1788441039563.jpg';
-import appLogoImg from '../assets/images/app_logo_benin_1788086413997.jpg';
+import appLogoImg from '../assets/images/liencolis_official_logo_1788816569316.jpg';
 
 import {
   Shield,
@@ -47,6 +47,7 @@ interface HomeHeroProps {
   onInstallApp?: () => void;
   onNavigateToTab?: (tab: string) => void;
   onTrackParcel?: (code: string) => void;
+  currentUser?: any;
 }
 
 interface HeroSlide {
@@ -75,6 +76,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   onInstallApp,
   onNavigateToTab,
   onTrackParcel,
+  currentUser,
 }) => {
   const [heroTrackingCode, setHeroTrackingCode] = useState('');
   // Slides data showing couriers, community ties, shopkeepers and solidarity
@@ -186,10 +188,35 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Left Text & Value Proposition */}
           <div className="lg:col-span-6 space-y-6 pt-2">
-            {/* Pill Header */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold tracking-wide">
-              <Shield className="w-4 h-4 text-emerald-400" />
-              <span>liencolis (driver and communauty) 🇧🇯 • liencolisdrivercom.com</span>
+            {/* Haut de texte : Badge Officiel + Boutons Connexion / Inscription */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold tracking-wide">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span>liencolis (driver and communauty) 🇧🇯 • lincom-1ecc6.web.app</span>
+              </div>
+
+              {!currentUser && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenAuth('login')}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-800/95 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                    id="hero-top-login-btn"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Connexion</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onOpenAuth('register')}
+                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/25 transition-all active:scale-95"
+                    id="hero-top-register-btn"
+                  >
+                    <UserPlus className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Inscription</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black font-display tracking-tight leading-tight">

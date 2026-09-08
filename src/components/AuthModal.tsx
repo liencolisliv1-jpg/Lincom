@@ -760,16 +760,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <KeyRound className="w-8 h-8 text-amber-400 mx-auto" />
               <h3 className="text-sm font-bold text-white">Réinitialisation du Mot de Passe</h3>
               <p className="text-slate-300">
-                Saisissez votre email pour recevoir le lien de réinstallation sécurisé.
+                Saisissez votre email pour recevoir le lien de réinstallation sécurisé ou utilisez l'assistance WhatsApp.
               </p>
             </div>
 
             {forgotEmailSent ? (
-              <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-emerald-300 text-center space-y-2">
-                <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-400" />
-                <p>
-                  Lien de réinitialisation transmis avec succès à <strong>{forgotEmailInput || 'votre adresse email'}</strong> !
+              <div className="p-3.5 bg-emerald-950/60 border border-emerald-500/40 rounded-2xl text-emerald-300 text-center space-y-3">
+                <CheckCircle2 className="w-7 h-7 mx-auto text-emerald-400" />
+                <p className="text-xs font-medium">
+                  Lien de réinitialisation transmis avec succès à <strong className="text-amber-300">{forgotEmailInput || 'votre adresse email'}</strong> !
                 </p>
+
+                <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl text-slate-300 text-[11px] text-left space-y-1.5">
+                  <p className="font-bold text-amber-400 flex items-center gap-1">
+                    <span>💡 E-mail non reçu dans votre boîte Gmail ?</span>
+                  </p>
+                  <p>1. Vérifiez vos <strong>Courriers Indésirables / Spams</strong> dans Gmail.</p>
+                  <p>2. Si l'e-mail tarde, débloquez votre compte directement par WhatsApp ci-dessous.</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetPhone = '2290169814631';
+                    const textMsg = encodeURIComponent(
+                      `Bonjour Support LienColis Bénin ! J'ai oublié mon mot de passe.\n📧 Adresse Email : ${forgotEmailInput}\nMerci de m'aider à réinitialiser mon compte.`
+                    );
+                    window.open(`https://wa.me/${targetPhone}?text=${textMsg}`, '_blank');
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>📲 Assistance Réinitialisation Rapide WhatsApp (+229)</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -777,7 +801,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     setForgotError(null);
                     setMode('login');
                   }}
-                  className="text-white underline font-bold"
+                  className="text-white underline font-bold text-xs block mx-auto pt-1"
                 >
                   Retour à la connexion
                 </button>
@@ -788,32 +812,69 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="space-y-3"
               >
                 {forgotError && (
-                  <div className="p-2 bg-red-950/80 border border-red-500/50 rounded-xl text-red-300 text-xs">
+                  <div className="p-2.5 bg-red-950/80 border border-red-500/50 rounded-xl text-red-300 text-xs">
                     {forgotError}
                   </div>
                 )}
-                <input
-                  type="email"
-                  required
-                  value={forgotEmailInput}
-                  onChange={(e) => setForgotEmailInput(e.target.value)}
-                  placeholder="votre.email@gmail.com"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-400"
-                />
+                <div>
+                  <label className="font-semibold text-slate-300 block mb-1">Votre Adresse Email Inscrite *</label>
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmailInput}
+                    onChange={(e) => setForgotEmailInput(e.target.value)}
+                    placeholder="votre.email@gmail.com"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
+
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-md flex items-center justify-center gap-1.5"
+                  disabled={isLoading}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:opacity-50 text-slate-950 font-black shadow-md flex items-center justify-center gap-1.5"
                 >
-                  <Send className="w-4 h-4" />
-                  <span>Envoyer le Lien de Récupération</span>
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                      <span>Envoi en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Envoyer le Lien de Récupération Email</span>
+                    </>
+                  )}
                 </button>
+
+                <div className="flex items-center gap-2 text-slate-500 text-[10px] my-1">
+                  <div className="h-px bg-slate-800 flex-1" />
+                  <span>OU ASSISTANCE DIRECTE BÉNIN</span>
+                  <div className="h-px bg-slate-800 flex-1" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const emailParam = forgotEmailInput ? forgotEmailInput : 'non spécifiée';
+                    const targetPhone = '2290169814631';
+                    const textMsg = encodeURIComponent(
+                      `Bonjour Support LienColis Bénin ! J'ai oublié mon mot de passe.\n📧 Mon Email : ${emailParam}\nMerci de m'aider à débloquer mon compte.`
+                    );
+                    window.open(`https://wa.me/${targetPhone}?text=${textMsg}`, '_blank');
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>📲 Débloquer mon Compte par WhatsApp (+229)</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     setForgotError(null);
                     setMode('login');
                   }}
-                  className="w-full text-center text-slate-400 hover:text-white"
+                  className="w-full text-center text-slate-400 hover:text-white pt-1"
                 >
                   Annuler
                 </button>

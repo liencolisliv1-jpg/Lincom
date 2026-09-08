@@ -84,6 +84,13 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     if (onRefreshUnreadCount) onRefreshUnreadCount();
   };
 
+  const handleDeleteOne = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    notificationService.deleteNotification(id);
+    loadData();
+    if (onRefreshUnreadCount) onRefreshUnreadCount();
+  };
+
   const handleNotificationClick = (notif: AppNotification) => {
     notificationService.markAsRead(notif.id);
     loadData();
@@ -107,8 +114,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   const triggerTestRecruitment = () => {
     notificationService.sendPushNotification({
       type: 'recruitment',
-      title: '📢 Recrutement : E-commerce Cotonou (3 Livreurs)',
-      body: 'Bénin Express Logistics recrute immédiatement 3 livreurs 2-roues pour livraison de colis e-commerce. Salaire 150 000 FCFA/mois + carburant pris en charge.',
+      title: '📢 Recrutement Livreur (Cotonou)',
+      body: 'Un utilisateur a publié une annonce de recrutement pour des courses 2-roues. Consultez les annonces pour postuler.',
       city: 'Cotonou',
       targetTab: 'classifieds',
       actionLabel: 'Postuler à l\'offre',
@@ -122,8 +129,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   const triggerTestBadgeExpiration = () => {
     notificationService.sendPushNotification({
       type: 'badge_expiration',
-      title: '⭐ Rappel Expiration Badge VIP 500F (24h restantes)',
-      body: 'Votre badge VIP expire bientôt. Renouvelez pour 500 FCFA/semaine. Support : liencolisdrivercommunauty@gmail.com, +229 01 69 81 46 32 / +229 01 47 65 24 20.',
+      title: '⭐ Rappel Expiration Badge VIP 500F',
+      body: 'Un utilisateur a renouvelé son profil prioritaire. Pensez à renouveler votre badge VIP pour conserver la priorité.',
       city: 'Cotonou',
       actionPurpose: 'premium_badge_week',
       actionLabel: 'Renouveler mon Badge (500F)',
@@ -136,11 +143,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
 
   const triggerTestUrgentDelivery = () => {
     notificationService.notifyUrgentDelivery(
-      'Course Urgente Médicaments Ganhi ➔ Haie Vive',
+      'Course Urgente de Colis',
       'Cotonou',
       2000
     );
-    setTestNotificationFeedback('Alerte course urgente 30min envoyée !');
+    setTestNotificationFeedback('Alerte course urgente envoyée !');
     loadData();
     if (onRefreshUnreadCount) onRefreshUnreadCount();
     setTimeout(() => setTestNotificationFeedback(null), 3000);
@@ -468,12 +475,22 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                             <span className="w-2 h-2 rounded-full bg-amber-400 inline-block animate-ping" />
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-400 shrink-0">
-                          {new Date(notif.timestamp).toLocaleTimeString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(notif.timestamp).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteOne(e, notif.id)}
+                            className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-700/60 transition-colors"
+                            title="Supprimer cette alerte"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">{notif.body}</p>

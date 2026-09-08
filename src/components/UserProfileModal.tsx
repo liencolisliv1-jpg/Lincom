@@ -46,6 +46,7 @@ import {
   Check,
   Key,
   RefreshCw,
+  RotateCcw,
 } from 'lucide-react';
 
 interface UserProfileModalProps {
@@ -55,6 +56,7 @@ interface UserProfileModalProps {
   onUpdateUser: (user: UserProfile) => void;
   onDeleteAccount: () => void;
   onOpenPayment: (purpose?: PaymentPurpose) => void;
+  onResetToDefaults?: () => void;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -64,6 +66,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onUpdateUser,
   onDeleteAccount,
   onOpenPayment,
+  onResetToDefaults,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editCountryCode, setEditCountryCode] = useState(currentUser?.countryCode || 'BJ');
@@ -1136,19 +1139,37 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         </div>
 
         {/* Account Deletion & Footer */}
-        <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-          <button
-            onClick={() => {
-              if (confirm('Êtes-vous sûr de vouloir supprimer définitivement votre compte Liencolis ? Cette action est irréversible.')) {
-                onDeleteAccount();
-                onClose();
-              }
-            }}
-            className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1.5"
-          >
-            <Trash2 className="w-4 h-4" />
-            <span>Supprimer mon compte</span>
-          </button>
+        <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                if (confirm('Êtes-vous sûr de vouloir supprimer définitivement votre compte Liencolis ? Cette action est irréversible.')) {
+                  onDeleteAccount();
+                  onClose();
+                }
+              }}
+              className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1.5"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Supprimer mon compte</span>
+            </button>
+
+            {onResetToDefaults && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Voulez-vous réinitialiser toute l\'application Liencolis à son état d\'origine par défaut ?')) {
+                    onResetToDefaults();
+                    onClose();
+                  }
+                }}
+                className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Remettre l'App par défaut</span>
+              </button>
+            )}
+          </div>
 
           <button
             onClick={onClose}

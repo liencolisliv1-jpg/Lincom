@@ -33,8 +33,8 @@ export const MobileInstallModal: React.FC<MobileInstallModalProps> = ({
   const [isInstalled, setIsInstalled] = useState(false);
   const [testNotificationStatus, setTestNotificationStatus] = useState<string | null>(null);
 
-  const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://liencolisdrivercom.com';
-  const customDomainUrl = 'https://liencolisdrivercom.com';
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://lincom-1ecc6.web.app';
+  const customDomainUrl = 'https://lincom-1ecc6.web.app';
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -296,13 +296,13 @@ export const MobileInstallModal: React.FC<MobileInstallModalProps> = ({
                   <div className="space-y-0.5">
                     <span className="text-[11px] font-black text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
                       <Globe className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Domaine Officiel : liencolisdrivercom.com</span>
+                      <span>Domaine Officiel : lincom-1ecc6.web.app</span>
                     </span>
-                    <p className="text-xs font-mono text-white font-bold">https://liencolisdrivercom.com</p>
+                    <p className="text-xs font-mono text-white font-bold">https://lincom-1ecc6.web.app</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleCopy('https://liencolisdrivercom.com', 'custom-domain')}
+                    onClick={() => handleCopy('https://lincom-1ecc6.web.app', 'custom-domain')}
                     className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow flex items-center gap-1.5 shrink-0"
                   >
                     {copiedCmd === 'custom-domain' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-950" /> : <Copy className="w-3.5 h-3.5" />}

@@ -1,4 +1,5 @@
 import React from 'react';
+import officialLogoImg from '../assets/images/liencolis_official_logo_1788816569316.jpg';
 
 interface LiencolisLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -16,8 +17,8 @@ export const LiencolisLogo: React.FC<LiencolisLogoProps> = ({
   onClick,
 }) => {
   const sizeMap = {
-    sm: { icon: 34, text: 'text-base', sub: 'text-[9px]' },
-    md: { icon: 46, text: 'text-xl', sub: 'text-xs' },
+    sm: { icon: 36, text: 'text-base', sub: 'text-[9px]' },
+    md: { icon: 44, text: 'text-xl', sub: 'text-xs' },
     lg: { icon: 64, text: 'text-2xl', sub: 'text-sm' },
     xl: { icon: 96, text: 'text-4xl', sub: 'text-base' },
   };
@@ -27,21 +28,21 @@ export const LiencolisLogo: React.FC<LiencolisLogoProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`inline-flex items-center gap-3 select-none ${onClick ? 'cursor-pointer hover:opacity-95 transition-opacity' : ''} ${className}`}
+      className={`inline-flex items-center gap-2.5 select-none ${onClick ? 'cursor-pointer hover:opacity-95 transition-opacity' : ''} ${className}`}
       id="liencolis-logo-brand"
     >
-      {/* Official Emblem Icon with Transparent Background for Light Mode */}
+      {/* Official Circular Emblem */}
       <div 
-        className="relative flex items-center justify-center shrink-0 overflow-hidden"
+        className="relative flex items-center justify-center shrink-0 rounded-full overflow-hidden shadow-md ring-1 ring-slate-700/50 bg-[#0A162B]"
         style={{
           width: currentSize.icon,
           height: currentSize.icon,
         }}
       >
         <img
-          src="/icon.svg"
-          alt="Logo LienColis"
-          className="w-full h-full object-contain filter drop-shadow-sm"
+          src={officialLogoImg}
+          alt="LienColis Logo"
+          className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
         />
       </div>

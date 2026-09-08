@@ -43,28 +43,29 @@ export const MapLibreView: React.FC<MapLibreViewProps> = ({
         ]
       : [2.4183, 6.3703]; // Cotonou centre [lng, lat]
 
-    // High performance vector raster style with zero API key requirement (CARTO / OSM Free Vector Tiles)
+    // High performance raster style with CartoDB Voyager (Full CORS support, zero API key requirement, fast CDN)
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: {
         version: 8,
         sources: {
-          'osm-tiles': {
+          'carto-tiles': {
             type: 'raster',
             tiles: [
-              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+              'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+              'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+              'https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
             ],
             tileSize: 256,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
           },
         },
         layers: [
           {
-            id: 'osm-tiles-layer',
+            id: 'carto-tiles-layer',
             type: 'raster',
-            source: 'osm-tiles',
+            source: 'carto-tiles',
             minzoom: 0,
             maxzoom: 19,
           },
@@ -74,6 +75,17 @@ export const MapLibreView: React.FC<MapLibreViewProps> = ({
       zoom: 13,
       pitch: 0,
       bearing: 0,
+    });
+
+    // Gracefully handle tile loading or network errors to prevent uncaught AJAXError popups
+    map.on('error', (e) => {
+      const err = e?.error as any;
+      const msg = err?.message || '';
+      if (msg.includes('Failed to fetch') || err?.status === 0 || err?.status === 404) {
+        // Suppress benign network/offline tile warnings
+        return;
+      }
+      console.warn('[MapLibreView] Map event:', msg || e);
     });
 
     // Add navigation controls (Zoom +/- & Pitch/Bearing Compass)

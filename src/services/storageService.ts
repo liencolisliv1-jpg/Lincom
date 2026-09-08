@@ -869,9 +869,13 @@ class StorageService {
   public getDeliveries(): Delivery[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.DELIVERIES);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {}
-    return [];
+    this.saveDeliveries(DEFAULT_DELIVERIES);
+    return DEFAULT_DELIVERIES;
   }
 
   public saveDeliveries(deliveries: Delivery[]): void {
@@ -892,14 +896,21 @@ class StorageService {
   public getMessages(groupId?: string): ChatMessage[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.MESSAGES);
-      const all: ChatMessage[] = data ? JSON.parse(data) : [];
-      if (groupId) {
-        return all.filter((m) => m.groupId === groupId);
+      if (data) {
+        const all: ChatMessage[] = JSON.parse(data);
+        if (Array.isArray(all) && all.length > 0) {
+          if (groupId) {
+            return all.filter((m) => m.groupId === groupId);
+          }
+          return all;
+        }
       }
-      return all;
-    } catch {
-      return [];
+    } catch {}
+    this.saveMessages(DEFAULT_MESSAGES);
+    if (groupId) {
+      return DEFAULT_MESSAGES.filter((m) => m.groupId === groupId);
     }
+    return DEFAULT_MESSAGES;
   }
 
   public saveMessages(messages: ChatMessage[]): void {
@@ -915,9 +926,13 @@ class StorageService {
   public getAds(): ClassifiedAd[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ADS);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {}
-    return [];
+    this.saveAds(DEFAULT_ADS);
+    return DEFAULT_ADS;
   }
 
   public saveAds(ads: ClassifiedAd[]): void {
@@ -938,9 +953,13 @@ class StorageService {
   public getMarketplace(): MarketplaceItem[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.MARKETPLACE);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {}
-    return [];
+    this.saveMarketplace(DEFAULT_MARKETPLACE);
+    return DEFAULT_MARKETPLACE;
   }
 
   public saveMarketplace(items: MarketplaceItem[]): void {
@@ -956,9 +975,13 @@ class StorageService {
   public getRentals(): RentalItem[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.RENTALS);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {}
-    return [];
+    this.saveRentals(DEFAULT_RENTALS);
+    return DEFAULT_RENTALS;
   }
 
   public saveRentals(rentals: RentalItem[]): void {
@@ -974,9 +997,13 @@ class StorageService {
   public getAidRequests(): AidRequest[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.AID_REQUESTS);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {}
-    return [];
+    this.saveAidRequests(DEFAULT_AID_REQUESTS);
+    return DEFAULT_AID_REQUESTS;
   }
 
   public saveAidRequests(requests: AidRequest[]): void {
@@ -1435,6 +1462,34 @@ class StorageService {
       dispatchedAt: new Date().toISOString(),
     };
     localStorage.setItem('liencolis_midnight_dispatch_logs', JSON.stringify([newEntry, ...existing.slice(0, 49)]));
+  }
+
+  public resetAllToDefaults(): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(DEFAULT_DELIVERIES));
+      localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(DEFAULT_MESSAGES));
+      localStorage.setItem(STORAGE_KEYS.ADS, JSON.stringify(DEFAULT_ADS));
+      localStorage.setItem(STORAGE_KEYS.MARKETPLACE, JSON.stringify(DEFAULT_MARKETPLACE));
+      localStorage.setItem(STORAGE_KEYS.RENTALS, JSON.stringify(DEFAULT_RENTALS));
+      localStorage.setItem(STORAGE_KEYS.AID_REQUESTS, JSON.stringify(DEFAULT_AID_REQUESTS));
+      localStorage.setItem(STORAGE_KEYS.TONTINE_CYCLES, JSON.stringify(DEFAULT_TONTINE_CYCLES));
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
+      localStorage.removeItem(STORAGE_KEYS.ADMIN_SUMMARIES);
+      localStorage.removeItem(STORAGE_KEYS.PLATFORM_WITHDRAWALS);
+      localStorage.setItem(STORAGE_KEYS.ADMIN_PIN, '2026');
+      localStorage.setItem(STORAGE_KEYS.ADMIN_PASSWORD, 'admin1234');
+      localStorage.setItem(STORAGE_KEYS.COUNTRY, 'BJ');
+      localStorage.setItem(STORAGE_KEYS.CURRENCY, 'FCFA');
+      localStorage.removeItem('liencolis_midnight_settings');
+      localStorage.removeItem('liencolis_midnight_dispatch_logs');
+      localStorage.removeItem('liencolis_midnight_auto_dispatched_day');
+      localStorage.removeItem('liencolis_offline_queue');
+      localStorage.removeItem('liencolis_forced_offline');
+      localStorage.removeItem('liencolis_current_session');
+    } catch (e) {
+      console.warn('[StorageService] Error resetting to defaults:', e);
+    }
   }
 }
 
