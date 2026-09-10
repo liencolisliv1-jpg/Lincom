@@ -102,6 +102,20 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.sellerId == request.auth.uid);
     }
 
+    // Direct In-App Conversations (Marketplace & Vehicle Rentals)
+    match /conversations/{convId} {
+      allow read, write: if true;
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Custom Driver & Community Chat Groups
+    match /customGroups/{groupId} {
+      allow read, write: if true;
+    }
+
     // Real-time Push Notifications Broadcast
     match /pushNotifications/{notifId} {
       allow read: if true;

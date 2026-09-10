@@ -10,6 +10,7 @@ import { InAppCallScreen } from './InAppCallScreen';
 import { LiveTrackingModal } from './LiveTrackingModal';
 import { RouteOptimizerModal } from './RouteOptimizerModal';
 import { DailyDeliveryMidnightDigestModal } from './DailyDeliveryMidnightDigestModal';
+import { QuickDeliveryModal } from './QuickDeliveryModal';
 import { GoogleMapView } from './GoogleMapView';
 import { MapLibreView } from './MapLibreView';
 import { getPublicTrackingUrl } from '../utils/trackingUrl';
@@ -157,18 +158,6 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
       setShowNewDeliveryModal(true);
     }
   }, [triggerNewDeliveryModal]);
-
-  // New Delivery Form State
-  const [newClientPseudo, setNewClientPseudo] = useState('');
-  const [newClientPhone, setNewClientPhone] = useState('+229 ');
-  const [newEmergencyPhone, setNewEmergencyPhone] = useState('+229 ');
-  const [newEmergencyName, setNewEmergencyName] = useState('');
-  const [newPickupAddress, setNewPickupAddress] = useState('');
-  const [newPickupCity, setNewPickupCity] = useState('Cotonou');
-  const [newDropoffAddress, setNewDropoffAddress] = useState('');
-  const [newDropoffCity, setNewDropoffCity] = useState('Cotonou');
-  const [newPackageDesc, setNewPackageDesc] = useState('');
-  const [newFee, setNewFee] = useState('1500');
 
   const selectedDelivery = deliveries.find((d) => d.id === selectedDeliveryId) || deliveries[0];
 
@@ -452,56 +441,6 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
     checkMidnightAutoDispatch();
     return () => clearInterval(interval);
   }, [deliveries, currentUser]);
-
-  const handleCreateDelivery = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isMuted) {
-      alert(
-        `🔒 Action impossible : Votre compte est en sourdine car votre solde prépayé est de ${currentUser?.driverWallet?.balance ?? 0} FCFA (inférieur au seuil de 50 FCFA).\n\nVeuillez recharger votre portefeuille (à partir de 250 FCFA) pour démarrer une nouvelle livraison.`
-      );
-      return;
-    }
-
-    if (!newClientPseudo || !newClientPhone || !newEmergencyPhone || !newDropoffAddress) {
-      alert('Veuillez remplir tous les champs obligatoires (incluant le Numéro de Secours).');
-      return;
-    }
-
-    const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
-    const newDel: Delivery = {
-      id: `del_${Date.now()}`,
-      trackingCode: `LC-BJ-${Math.floor(1000 + Math.random() * 9000)}`,
-      clientPseudo: newClientPseudo,
-      clientPhone: newClientPhone,
-      emergencyPhone: newEmergencyPhone,
-      emergencyContactName: newEmergencyName || 'Personne de confiance',
-      pickupAddress: newPickupAddress || 'Boutique Cotonou',
-      pickupCity: newPickupCity,
-      dropoffAddress: newDropoffAddress,
-      dropoffCity: newDropoffCity,
-      packageDescription: newPackageDesc || 'Colis standard',
-      deliveryFee: parseInt(newFee) || 1500,
-      status: 'in_transit',
-      driverId: currentUser?.id || 'usr_driver_01',
-      driverName: currentUser?.name || 'Germain Mensah',
-      driverPhone: currentUser?.phone || '+229 01 69 81 46 31',
-      driverLat: 6.3703,
-      driverLng: 2.4183,
-      targetLat: 6.3622,
-      targetLng: 2.3951,
-      distanceRemainingMeters: 1400,
-      estimatedArrivalMinutes: 6,
-      securityPin: randomPin,
-      isPrimaryAlertSent: false,
-      isRobotVoiceTriggered: false,
-      createdAt: new Date().toISOString(),
-    };
-
-    onAddDelivery(newDel);
-    setSelectedDeliveryId(newDel.id);
-    setShowNewDeliveryModal(false);
-    voiceService.speak("Nouvelle livraison enregistrée. GPS et itinéraire activés. Alerte de sécurité mains-libres prête.");
-  };
 
   const handleApplyOptimizedOrder = (reorderedDeliveryIds: string[]) => {
     if (!reorderedDeliveryIds || reorderedDeliveryIds.length === 0) return;
@@ -821,10 +760,10 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
                           : 'text-slate-400 hover:text-white hover:bg-slate-800'
                       }`}
                       id="toggle-mode-maplibre"
-                      title="Carte MapLibre GL WebGL (Rapide, Fluide & Gratuite)"
+                      title="Carte OpenStreetMap & Satellite Bénin (Rapide, Fluide & Sans Clé API)"
                     >
                       <MapPin className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>MapLibre GL</span>
+                      <span>Carte OSM &amp; Satellite (Gratuit)</span>
                     </button>
 
                     <button
@@ -836,6 +775,7 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
                           : 'text-slate-400 hover:text-white hover:bg-slate-800'
                       }`}
                       id="toggle-mode-google-maps"
+                      title="Google Maps Platform (Nécessite Clé API Google Cloud)"
                     >
                       <MapPin className="w-3.5 h-3.5 text-amber-300" />
                       <span>Google Maps</span>
@@ -1544,160 +1484,18 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
         </div>
       )}
 
-      {/* New Delivery Registration Modal */}
-      {showNewDeliveryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Navigation className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">Enregistrer une Nouvelle Livraison</h3>
-              </div>
-              <button onClick={() => setShowNewDeliveryModal(false)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-
-            <form onSubmit={handleCreateDelivery} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1">Pseudo / Nom Client *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newClientPseudo}
-                    onChange={(e) => setNewClientPseudo(e.target.value)}
-                    placeholder="Ex: Mme Chimène"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1">N° WhatsApp Client *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newClientPhone}
-                    onChange={(e) => setNewClientPhone(e.target.value)}
-                    placeholder="+229 97 00 00 00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
-                  />
-                </div>
-              </div>
-
-              {/* Emergency Contact (Facultatif) */}
-              <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-700/40 space-y-2">
-                <div className="flex items-center gap-1.5 text-amber-300 font-bold">
-                  <Shield className="w-4 h-4" />
-                  <span>Numéro de Secours (Facultatif - Personne de Confiance)</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={newEmergencyPhone}
-                    onChange={(e) => setNewEmergencyPhone(e.target.value)}
-                    placeholder="N° Secours facultatif (+229 ...)"
-                    className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white"
-                  />
-                  <input
-                    type="text"
-                    value={newEmergencyName}
-                    onChange={(e) => setNewEmergencyName(e.target.value)}
-                    placeholder="Lien (ex: Frère, Voisin)"
-                    className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white"
-                  />
-                </div>
-              </div>
-
-              {/* Locations */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1">Adresse de Ramassage</label>
-                  <input
-                    type="text"
-                    value={newPickupAddress}
-                    onChange={(e) => setNewPickupAddress(e.target.value)}
-                    placeholder="Boutique Dantokpa"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1">Ville de Départ (Bénin)</label>
-                  <select
-                    value={newPickupCity}
-                    onChange={(e) => setNewPickupCity(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
-                  >
-                    {BENIN_CITY_NAMES.map((cityName) => (
-                      <option key={cityName} value={cityName}>
-                        {cityName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1">Adresse de Destination *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newDropoffAddress}
-                    onChange={(e) => setNewDropoffAddress(e.target.value)}
-                    placeholder="Haie Vive, Rue 312"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1">Ville d'Arrivée (Bénin)</label>
-                  <select
-                    value={newDropoffCity}
-                    onChange={(e) => setNewDropoffCity(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
-                  >
-                    {BENIN_CITY_NAMES.map((cityName) => (
-                      <option key={cityName} value={cityName}>
-                        {cityName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1">Contenu du Colis</label>
-                  <input
-                    type="text"
-                    value={newPackageDesc}
-                    onChange={(e) => setNewPackageDesc(e.target.value)}
-                    placeholder="Plats, vêtements, pièces..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-semibold text-slate-300 block mb-1">Prix de la Course (FCFA)</label>
-                  <input
-                    type="number"
-                    value={newFee}
-                    onChange={(e) => setNewFee(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-amber-400 font-bold"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-lg mt-2 transition-transform hover:scale-[1.01]"
-              >
-                Créer & Démarrer la Livraison
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* New Fast & Simple Delivery Registration Modal */}
+      <QuickDeliveryModal
+        isOpen={showNewDeliveryModal}
+        onClose={() => setShowNewDeliveryModal(false)}
+        currentUser={currentUser}
+        isMuted={isMuted}
+        onAddDelivery={(newDel) => {
+          onAddDelivery(newDel);
+          setSelectedDeliveryId(newDel.id);
+        }}
+        onOpenPayment={onOpenPayment}
+      />
 
       {/* In-App Call Screen Modal (Triggered automatically at 300m or manually) */}
       {selectedDelivery && (

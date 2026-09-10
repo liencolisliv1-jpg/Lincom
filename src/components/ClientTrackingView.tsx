@@ -300,10 +300,10 @@ export const ClientTrackingView: React.FC<ClientTrackingViewProps> = ({
                     ? 'bg-emerald-600 text-white shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="Carte MapLibre GL WebGL (Rapide & Gratuite)"
+                title="Carte OpenStreetMap & Satellite Bénin (Rapide, Fluide & 100% Gratuite)"
               >
                 <MapPin className="w-3.5 h-3.5 text-emerald-300" />
-                <span>MapLibre GL</span>
+                <span>Carte OSM &amp; Satellite (Gratuit)</span>
               </button>
               <button
                 type="button"

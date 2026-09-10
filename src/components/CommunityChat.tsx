@@ -1,8 +1,24 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChatMessage, UserProfile, UserRole, PaymentPurpose } from '../types';
+import {
+  ChatMessage,
+  UserProfile,
+  UserRole,
+  PaymentPurpose,
+  LiveLocationData,
+  CustomChatGroup,
+  MarketplaceItem,
+  RentalItem,
+} from '../types';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { EmojiStickerPicker, DriverSticker } from './EmojiStickerPicker';
+import { LiveLocationShareModal } from './LiveLocationShareModal';
+import { LiveLocationCard } from './LiveLocationCard';
+import { WalkieTalkieModal } from './WalkieTalkieModal';
+import { CreateCustomGroupModal } from './CreateCustomGroupModal';
+import { MarketplaceAndRentals } from './MarketplaceAndRentals';
 import { storageService } from '../services/storageService';
+import { firestoreService } from '../services/firestoreService';
+import { voiceService } from '../services/voiceService';
 import {
   MessageSquare,
   Users,
@@ -41,6 +57,20 @@ import {
   ThumbsUp,
   Flame,
   Heart,
+  Radio,
+  Navigation,
+  Compass,
+  Headphones,
+  ShoppingBag,
+  Plus,
+  Trash2,
+  UserPlus,
+  LogOut,
+  Tag,
+  Filter,
+  Layers,
+  Search,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface CommunityChatProps {
@@ -48,7 +78,15 @@ interface CommunityChatProps {
   currentUser: UserProfile | null;
   onSendMessage: (message: ChatMessage) => void;
   onOpenPayment: (purpose?: PaymentPurpose) => void;
+  onOpenProfile?: () => void;
+  onUpdateUser?: (updated: UserProfile) => void;
   isDarkMode: boolean;
+  marketplaceItems?: MarketplaceItem[];
+  rentalItems?: RentalItem[];
+  onAddMarketplaceItem?: (item: MarketplaceItem) => void;
+  onAddRentalItem?: (rental: RentalItem) => void;
+  onOpenAuth?: () => void;
+  initialCommunitySubTab?: 'discussions' | 'marketplace' | 'rentals' | 'drivers';
 }
 
 interface CityGroupDef {
@@ -64,6 +102,7 @@ interface CityGroupDef {
 export interface CommunityDriverProfile {
   id: string;
   name: string;
+  avatarUrl?: string;
   city: string;
   phone: string;
   whatsapp?: string;
@@ -83,6 +122,7 @@ const DEFAULT_COMMUNITY_DRIVERS: CommunityDriverProfile[] = [
   {
     id: 'usr_driver_01',
     name: 'Livreur Demo',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=256&q=80',
     city: 'Cotonou',
     phone: '+229 00 00 00 00',
     whatsapp: '+22900000000',
@@ -99,6 +139,7 @@ const DEFAULT_COMMUNITY_DRIVERS: CommunityDriverProfile[] = [
   {
     id: 'usr_02',
     name: 'Paul A. (Express)',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=256&q=80',
     city: 'Cotonou',
     phone: '+229 97 45 67 89',
     whatsapp: '+22997456789',
@@ -115,6 +156,7 @@ const DEFAULT_COMMUNITY_DRIVERS: CommunityDriverProfile[] = [
   {
     id: 'usr_driver_08',
     name: 'Mireille Tossou',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=256&q=80',
     city: 'Cotonou',
     phone: '+229 96 88 11 22',
     whatsapp: '+22996881122',
@@ -131,6 +173,7 @@ const DEFAULT_COMMUNITY_DRIVERS: CommunityDriverProfile[] = [
   {
     id: 'usr_05',
     name: 'Fabrice Dossou',
+    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=256&q=80',
     city: 'Abomey-Calavi',
     phone: '+229 96 55 44 33',
     whatsapp: '+22996554433',
@@ -147,6 +190,7 @@ const DEFAULT_COMMUNITY_DRIVERS: CommunityDriverProfile[] = [
   {
     id: 'usr_06',
     name: 'Alain Houénou',
+    avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=256&q=80',
     city: 'Porto-Novo',
     phone: '+229 95 10 20 30',
     whatsapp: '+22995102030',
@@ -163,6 +207,7 @@ const DEFAULT_COMMUNITY_DRIVERS: CommunityDriverProfile[] = [
   {
     id: 'usr_07',
     name: 'Issa Bio',
+    avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=256&q=80',
     city: 'Parakou',
     phone: '+229 97 88 44 11',
     whatsapp: '+22997884411',
@@ -179,6 +224,7 @@ const DEFAULT_COMMUNITY_DRIVERS: CommunityDriverProfile[] = [
   {
     id: 'usr_09',
     name: 'Christian Agossou',
+    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=256&q=80',
     city: 'Cotonou',
     phone: '+229 94 33 22 11',
     vehicleType: 'moto_2wheels',
@@ -194,6 +240,7 @@ const DEFAULT_COMMUNITY_DRIVERS: CommunityDriverProfile[] = [
   {
     id: 'usr_10',
     name: 'Bio Saliou',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
     city: 'Abomey-Calavi',
     phone: '+229 95 66 77 88',
     vehicleType: 'moto_2wheels',
@@ -299,8 +346,24 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
   currentUser,
   onSendMessage,
   onOpenPayment,
+  onOpenProfile,
+  onUpdateUser,
   isDarkMode,
+  marketplaceItems = [],
+  rentalItems = [],
+  onAddMarketplaceItem,
+  onAddRentalItem,
+  onOpenAuth,
+  initialCommunitySubTab = 'discussions',
 }) => {
+  const [communitySubTab, setCommunitySubTab] = useState<'discussions' | 'marketplace' | 'rentals' | 'drivers'>(
+    initialCommunitySubTab
+  );
+  const [customGroups, setCustomGroups] = useState<CustomChatGroup[]>(() => {
+    return storageService.getCustomGroups();
+  });
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState<boolean>(false);
+  const [customGroupSearch, setCustomGroupSearch] = useState<string>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('global');
   const [inputText, setInputText] = useState('');
   const [moderationWarning, setModerationWarning] = useState<string | null>(null);
@@ -311,16 +374,63 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [showVipInfoModal, setShowVipInfoModal] = useState<boolean>(false);
   const [showCameraModal, setShowCameraModal] = useState<boolean>(false);
+  const [inspectedDriver, setInspectedDriver] = useState<CommunityDriverProfile | null>(null);
+  const [isUpdatingSelfAvatar, setIsUpdatingSelfAvatar] = useState<boolean>(false);
   const [messageReactions, setMessageReactions] = useState<Record<string, Record<string, number>>>({});
   const [isPinnedDriversExpanded, setIsPinnedDriversExpanded] = useState<boolean>(true);
-  const [sidebarTab, setSidebarTab] = useState<'groups' | 'pinned_drivers'>('groups');
+  const [sidebarTab, setSidebarTab] = useState<'city_groups' | 'custom_groups' | 'pinned_drivers'>('city_groups');
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
+  const [showLiveLocationModal, setShowLiveLocationModal] = useState<boolean>(false);
+  const [showWalkieTalkieModal, setShowWalkieTalkieModal] = useState<boolean>(false);
+  const [autoPlayIncomingAudio, setAutoPlayIncomingAudio] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('liencolis_autoplay_radio') === 'true';
+    }
+    return false;
+  });
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const recordIntervalRef = useRef<number | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const processedMessageIdsRef = useRef<Set<string>>(new Set());
 
-  const selectedGroup = CITY_GROUPS.find((g) => g.id === selectedGroupId) || CITY_GROUPS[0];
+  // Real-time synchronization of Custom Chat Groups via Firestore & StorageService
+  useEffect(() => {
+    const unsub = firestoreService.subscribeCustomGroups((remoteGroups) => {
+      if (remoteGroups && remoteGroups.length > 0) {
+        setCustomGroups(remoteGroups);
+        storageService.saveCustomGroups(remoteGroups);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const activeCustomGroup = customGroups.find((g) => g.id === selectedGroupId);
+  const activeCityGroup = CITY_GROUPS.find((g) => g.id === selectedGroupId);
+
+  const selectedGroup = useMemo(() => {
+    if (activeCustomGroup) {
+      return {
+        id: activeCustomGroup.id,
+        name: activeCustomGroup.name,
+        country: activeCustomGroup.country || 'Bénin',
+        flag: activeCustomGroup.iconEmoji || '💬',
+        isGlobal: false,
+        memberCount: activeCustomGroup.memberCount,
+        description: activeCustomGroup.description,
+        isCustom: true,
+        customGroup: activeCustomGroup,
+      };
+    }
+    const city = activeCityGroup || CITY_GROUPS[0];
+    return {
+      ...city,
+      isCustom: false,
+      customGroup: undefined,
+    };
+  }, [selectedGroupId, activeCustomGroup, activeCityGroup]);
+
   const groupMessages = messages.filter((m) => m.groupId === selectedGroupId);
 
   const isDriver = currentUser?.role === 'driver';
@@ -330,6 +440,50 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
   const currentUserHasVip = Boolean(
     currentUser?.premiumBadgeUntil && new Date(currentUser.premiumBadgeUntil).getTime() > Date.now()
   );
+
+  // Filtered custom groups based on search
+  const filteredCustomGroups = useMemo(() => {
+    if (!customGroupSearch.trim()) return customGroups;
+    const q = customGroupSearch.toLowerCase();
+    return customGroups.filter(
+      (g) =>
+        g.name.toLowerCase().includes(q) ||
+        g.description.toLowerCase().includes(q) ||
+        g.city.toLowerCase().includes(q) ||
+        g.category.toLowerCase().includes(q)
+    );
+  }, [customGroups, customGroupSearch]);
+
+  const handleCustomGroupCreated = (newGroup: CustomChatGroup) => {
+    storageService.addCustomGroup(newGroup);
+    firestoreService.saveCustomGroup(newGroup);
+    setCustomGroups((prev) => [newGroup, ...prev.filter((g) => g.id !== newGroup.id)]);
+    setSelectedGroupId(newGroup.id);
+    setSidebarTab('custom_groups');
+    setModerationWarning(null);
+  };
+
+  const handleDeleteCustomGroup = (groupId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('Voulez-vous vraiment supprimer ce groupe de conversation ?')) {
+      storageService.deleteCustomGroup(groupId);
+      firestoreService.deleteCustomGroup(groupId);
+      setCustomGroups((prev) => prev.filter((g) => g.id !== groupId));
+      if (selectedGroupId === groupId) {
+        setSelectedGroupId('global');
+      }
+    }
+  };
+
+  const handleJoinOrLeaveGroup = (groupId: string) => {
+    if (!currentUser) {
+      if (onOpenAuth) onOpenAuth();
+      return;
+    }
+    const res = storageService.joinOrLeaveCustomGroup(groupId, currentUser.id);
+    firestoreService.saveCustomGroup(res.group);
+    setCustomGroups((prev) => prev.map((g) => (g.id === groupId ? res.group : g)));
+  };
 
   // Compute drivers for current group with VIP PINNED AT THE TOP
   const cityDrivers = useMemo(() => {
@@ -341,6 +495,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
       const userDriverObj: CommunityDriverProfile = {
         id: currentUser.id,
         name: currentUser.name,
+        avatarUrl: currentUser.avatarUrl,
         city: currentUser.city || 'Cotonou',
         phone: currentUser.phone,
         whatsapp: currentUser.phone.replace(/[^0-9]/g, ''),
@@ -382,6 +537,35 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
       return a.hasPremiumBadge ? -1 : 1;
     });
   }, [currentUser, currentUserHasVip, selectedGroup]);
+
+  // Inspect driver profile in popup modal
+  const handleInspectDriver = (driverId: string, driverName: string, avatarUrl?: string, city?: string) => {
+    const existing = cityDrivers.find((d) => d.id === driverId || d.name.toLowerCase() === driverName.toLowerCase());
+    if (existing) {
+      setInspectedDriver({
+        ...existing,
+        avatarUrl: (driverId === currentUser?.id ? currentUser?.avatarUrl : undefined) || avatarUrl || existing.avatarUrl,
+      });
+    } else {
+      setInspectedDriver({
+        id: driverId,
+        name: driverName,
+        avatarUrl: (driverId === currentUser?.id ? currentUser?.avatarUrl : undefined) || avatarUrl,
+        city: city || currentUser?.city || 'Cotonou',
+        phone: '+229 01 69 81 46',
+        whatsapp: '22901698146',
+        vehicleType: 'moto_2wheels',
+        vehiclePlate: 'BJ-0000-AF',
+        rating: 4.9,
+        totalRatingsCount: 42,
+        completedDeliveries: 120,
+        isCertified: true,
+        hasPremiumBadge: false,
+        isOnline: true,
+        statusText: 'Membre actif de la communauté Liencolis',
+      });
+    }
+  };
 
   // List of only VIP pinned drivers
   const pinnedVipDrivers = useMemo(() => {
@@ -455,6 +639,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
       senderName: currentUser?.name || 'Germain Mensah',
       senderRole: currentUser?.role || 'driver',
       senderCity: currentUser?.city || 'Cotonou',
+      senderAvatar: currentUser?.avatarUrl,
       isDriverCertified: currentUser?.isCertified ?? true,
       hasPremiumBadge: currentUserHasVip,
       content: inputText.trim(),
@@ -488,6 +673,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
       senderName: currentUser?.name || 'Germain Mensah',
       senderRole: currentUser?.role || 'driver',
       senderCity: currentUser?.city || 'Cotonou',
+      senderAvatar: currentUser?.avatarUrl,
       isDriverCertified: currentUser?.isCertified ?? true,
       hasPremiumBadge: currentUserHasVip,
       content: `${sticker.emoji} [STICKER] ${sticker.title} - ${sticker.subtitle}`,
@@ -523,6 +709,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
       senderName: currentUser?.name || 'Germain Mensah',
       senderRole: currentUser?.role || 'driver',
       senderCity: currentUser?.city || 'Cotonou',
+      senderAvatar: currentUser?.avatarUrl,
       isDriverCertified: true,
       hasPremiumBadge: currentUserHasVip,
       content: '🎙️ Message vocal',
@@ -534,6 +721,157 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
     onSendMessage(newMsg);
     setIsRecordingVoice(false);
   };
+
+  // Toggle audio playback (supports Real Web Audio blobs & Speech Synthesis for canned alerts)
+  const handleToggleAudio = (msg: ChatMessage) => {
+    if (playingAudioId === msg.id) {
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setPlayingAudioId(null);
+      return;
+    }
+
+    // Stop currently running playback
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    setPlayingAudioId(msg.id);
+
+    if (msg.audioUrl && msg.audioUrl.startsWith('data:audio')) {
+      try {
+        const audio = new Audio(msg.audioUrl);
+        activeAudioRef.current = audio;
+        audio.onended = () => {
+          setPlayingAudioId(null);
+          activeAudioRef.current = null;
+        };
+        audio.onerror = () => {
+          setPlayingAudioId(null);
+          activeAudioRef.current = null;
+        };
+        audio.play().catch(() => setPlayingAudioId(null));
+      } catch {
+        setPlayingAudioId(null);
+      }
+    } else {
+      // Voice synthesis for canned radio / dispatches
+      voiceService.playRadioPttStart();
+      setTimeout(() => {
+        voiceService.speak(
+          msg.content.replace(/^[📻🎙️🚨🌧️📦⛽⚠️❓\s]+/, ''),
+          'fr-FR',
+          () => {
+            voiceService.playRadioPttEnd();
+            setPlayingAudioId(null);
+          }
+        );
+      }, 150);
+
+      setTimeout(() => {
+        setPlayingAudioId((prev) => (prev === msg.id ? null : prev));
+      }, Math.max(3000, (msg.audioDurationSeconds || 3) * 1000));
+    }
+  };
+
+  // Live Location Share Handler
+  const handleShareLiveLocation = (locationData: LiveLocationData, note: string) => {
+    if (isMuted) {
+      setModerationWarning('Votre compte est temporairement suspendu pour non-respect des règles.');
+      return;
+    }
+
+    const newMsg: ChatMessage = {
+      id: `msg_loc_${Date.now()}`,
+      groupId: selectedGroupId,
+      senderId: currentUser?.id || 'usr_driver_01',
+      senderName: currentUser?.name || 'Germain Mensah',
+      senderRole: currentUser?.role || 'driver',
+      senderCity: currentUser?.city || selectedGroup.name,
+      senderAvatar: currentUser?.avatarUrl,
+      isDriverCertified: true,
+      hasPremiumBadge: currentUserHasVip,
+      content: note ? `📍 ${note}` : `📍 Position partagée : ${locationData.landmark || locationData.address || 'En direct'}`,
+      location: locationData,
+      timestamp: new Date().toISOString(),
+    };
+
+    onSendMessage(newMsg);
+  };
+
+  // Walkie-Talkie Radio Message Handler
+  const handleSendWalkieTalkieMessage = (msgPartial: Partial<ChatMessage>) => {
+    if (isMuted) {
+      setModerationWarning('Votre compte est temporairement suspendu pour non-respect des règles.');
+      return;
+    }
+
+    const newMsg: ChatMessage = {
+      id: `msg_radio_${Date.now()}`,
+      groupId: selectedGroupId,
+      senderId: currentUser?.id || 'usr_driver_01',
+      senderName: currentUser?.name || 'Germain Mensah',
+      senderRole: currentUser?.role || 'driver',
+      senderCity: currentUser?.city || selectedGroup.name,
+      senderAvatar: currentUser?.avatarUrl,
+      isDriverCertified: true,
+      hasPremiumBadge: currentUserHasVip,
+      content: msgPartial.content || '📻 Message Radio Talkie-Walkie',
+      audioUrl: msgPartial.audioUrl,
+      audioDurationSeconds: msgPartial.audioDurationSeconds || 3,
+      isWalkieTalkie: true,
+      timestamp: new Date().toISOString(),
+    };
+
+    onSendMessage(newMsg);
+  };
+
+  const handleToggleAutoPlayIncomingAudio = (enabled: boolean) => {
+    setAutoPlayIncomingAudio(enabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('liencolis_autoplay_radio', enabled ? 'true' : 'false');
+    }
+  };
+
+  // Auto-play incoming audio if hands-free radio mode is enabled
+  useEffect(() => {
+    if (!autoPlayIncomingAudio) return;
+
+    // Track initial messages on mount so they don't all blast at once
+    if (processedMessageIdsRef.current.size === 0) {
+      messages.forEach((m) => processedMessageIdsRef.current.add(m.id));
+      return;
+    }
+
+    messages.forEach((msg) => {
+      if (!processedMessageIdsRef.current.has(msg.id)) {
+        processedMessageIdsRef.current.add(msg.id);
+        // Only autoplay new messages from other drivers
+        if (msg.senderId !== currentUser?.id && (msg.audioUrl || msg.isWalkieTalkie)) {
+          voiceService.playRadioPttStart();
+          setTimeout(() => {
+            if (msg.audioUrl && msg.audioUrl.startsWith('data:audio')) {
+              try {
+                const audio = new Audio(msg.audioUrl);
+                audio.play().catch(() => {});
+              } catch {}
+            } else if (msg.content) {
+              voiceService.speak(msg.content.replace(/^[📻🎙️🚨🌧️📦⛽⚠️❓\s]+/, ''));
+            }
+          }, 350);
+        }
+      }
+    });
+  }, [messages, autoPlayIncomingAudio, currentUser?.id]);
 
   // AI Translation Handler
   const handleTranslateMessage = async (msgId: string, text: string, targetLang = 'fr') => {
@@ -562,286 +900,713 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[680px]">
-        
-        {/* Left Sidebar: City & Global Groups / Pinned VIP Drivers (4 cols) */}
-        <div className="lg:col-span-4 border-r border-slate-800 bg-slate-950/70 flex flex-col">
-          {/* Header with VIP Badge Trigger */}
-          <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-black text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-emerald-400" />
-                <span>Salons & Livreurs</span>
-              </h2>
-              <p className="text-[11px] text-slate-400">Grand Groupe & Villes Bénin</p>
-            </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+      {/* Top Community Hub Sub-Navigation Bar */}
+      <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-2 shadow-xl flex flex-wrap items-center justify-between gap-2 backdrop-blur-md">
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setCommunitySubTab('discussions')}
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+              communitySubTab === 'discussions'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 ring-1 ring-blue-400'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            id="tab-btn-discussions"
+          >
+            <MessageSquare className="w-4 h-4 text-amber-400" />
+            <span>Salons & Groupes</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+              {CITY_GROUPS.length + customGroups.length}
+            </span>
+          </button>
 
-            {/* Stylized Golden Star Badge Button */}
-            <button
-              onClick={() => onOpenPayment('premium_badge_week')}
-              className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-[11px] flex items-center gap-1.5 shadow-md shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all ring-1 ring-amber-200"
-              title="Activer l'abonnement hebdomadaire de 500 FCFA pour épingler votre profil en tête de liste avec l'étoile dorée"
-              id="btn-vip-badge-header"
-            >
-              <Star className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
-              <span>Badge 500F/sem</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setCommunitySubTab('marketplace')}
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+              communitySubTab === 'marketplace'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-400'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            id="tab-btn-marketplace"
+          >
+            <ShoppingBag className="w-4 h-4 text-emerald-300" />
+            <span>Marketplace Matériel</span>
+            {marketplaceItems.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-950 text-emerald-300 font-mono">
+                {marketplaceItems.length}
+              </span>
+            )}
+          </button>
 
-          {/* Sub-tabs: Salons vs Livreurs VIP Épinglés */}
-          <div className="flex border-b border-slate-800 bg-slate-900/90 text-xs">
-            <button
-              onClick={() => setSidebarTab('groups')}
-              className={`flex-1 py-2.5 px-3 font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                sidebarTab === 'groups'
-                  ? 'text-amber-400 border-b-2 border-amber-400 bg-slate-800/60'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Salons ({CITY_GROUPS.length})</span>
-            </button>
-            <button
-              onClick={() => setSidebarTab('pinned_drivers')}
-              className={`flex-1 py-2.5 px-3 font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                sidebarTab === 'pinned_drivers'
-                  ? 'text-amber-400 border-b-2 border-amber-400 bg-slate-800/60'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              <span>VIP Épinglés ({pinnedVipDrivers.length})</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setCommunitySubTab('rentals')}
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+              communitySubTab === 'rentals'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/25 ring-1 ring-amber-400'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            id="tab-btn-rentals"
+          >
+            <Bike className="w-4 h-4 text-amber-300" />
+            <span>Location Véhicules</span>
+            {rentalItems.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-950 text-amber-300 font-mono">
+                {rentalItems.length}
+              </span>
+            )}
+          </button>
 
-          {/* Tab 1: Groups List */}
-          {sidebarTab === 'groups' && (
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 scrollbar-thin">
-              {/* Pricing Info Chip */}
-              <div className="p-3 bg-gradient-to-r from-blue-950/60 to-emerald-950/60 border-b border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
-                <span className="truncate">Abonnements villes : <strong>1200F / 1500F / 2000F</strong></span>
-                <button
-                  onClick={() => onOpenPayment('subscription_2wheels')}
-                  className="text-amber-400 font-bold hover:underline shrink-0 ml-1"
-                >
-                  Tarifs
-                </button>
-              </div>
-
-              {CITY_GROUPS.map((group) => {
-                const isSelected = group.id === selectedGroupId;
-                return (
-                  <button
-                    key={group.id}
-                    onClick={() => {
-                      setSelectedGroupId(group.id);
-                      setModerationWarning(null);
-                    }}
-                    className={`w-full text-left p-3.5 flex items-start gap-3 transition-colors ${
-                      isSelected ? 'bg-blue-600/20 border-l-4 border-amber-400' : 'hover:bg-slate-850'
-                    }`}
-                    id={`chat-group-${group.id}`}
-                  >
-                    <div className="text-2xl shrink-0 p-1 bg-slate-800 rounded-xl">{group.flag}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold truncate ${isSelected ? 'text-amber-300' : 'text-slate-100'}`}>
-                          {group.name}
-                        </span>
-                        {group.isGlobal ? (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            GRATUIT
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">{group.memberCount} mb</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{group.description}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Tab 2: Pinned VIP Drivers List */}
-          {sidebarTab === 'pinned_drivers' && (
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 scrollbar-thin p-2 space-y-2">
-              <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div className="text-[11px] leading-relaxed">
-                  <strong>Livreurs VIP Épinglés :</strong> Profils prioritaires ayant activé l'abonnement hebdomadaire de <strong>500 FCFA</strong>.
-                </div>
-              </div>
-
-              {pinnedVipDrivers.map((driver, idx) => (
-                <div
-                  key={driver.id}
-                  className="p-3 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-amber-500/40 hover:border-amber-400 shadow-md space-y-2 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow ring-2 ring-amber-400/80">
-                          {driver.name[0]}
-                        </div>
-                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[9px] font-black shadow">
-                          ★
-                        </span>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-black text-white">{driver.name}</span>
-                          <span className="text-emerald-400 text-xs font-bold" title="Livreur Certifié">✓</span>
-                        </div>
-                        <p className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
-                          <Pin className="w-3 h-3 text-amber-400" />
-                          <span>#{idx + 1} Épinglé en Tête</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 shadow-sm ring-1 ring-amber-300">
-                      ⭐ VIP 500F
-                    </span>
-                  </div>
-
-                  <div className="text-[11px] text-slate-300 flex items-center justify-between pt-1 border-t border-slate-800">
-                    <span className="flex items-center gap-1 text-amber-400 font-bold">
-                      <Star className="w-3 h-3 fill-amber-400" /> {driver.rating} ({driver.completedDeliveries} courses)
-                    </span>
-                    <span className="text-slate-400">📍 {driver.city}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    {isMuted ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          alert("🔒 Action bloquée : Votre compte est en sourdine car votre solde prépayé est inférieur à 50 FCFA. Veuillez recharger votre portefeuille pour contacter les chauffeurs.");
-                          onOpenPayment('wallet_deposit_1200');
-                        }}
-                        className="w-full py-1.5 px-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-500/50 text-red-300 font-bold text-[10px] text-center flex items-center justify-center gap-1 shadow"
-                      >
-                        <Lock className="w-3 h-3 text-red-400" />
-                        <span>Sourdine - Recharger pour contacter</span>
-                      </button>
-                    ) : (
-                      <>
-                        <a
-                          href={`tel:${driver.phone}`}
-                          className="flex-1 py-1 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold text-center flex items-center justify-center gap-1"
-                        >
-                          <Phone className="w-3 h-3" />
-                          <span>Appeler</span>
-                        </a>
-                        {driver.whatsapp && (
-                          <a
-                            href={`https://wa.me/${driver.whatsapp}?text=Bonjour%20${encodeURIComponent(driver.name)},%20je%20vous%20contacte%20via%20Liencolis%20pour%20une%20livraison.`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex-1 py-1 px-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold text-center"
-                          >
-                            WhatsApp
-                          </a>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {/* Call to action for drivers */}
-              <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-center space-y-2">
-                <p className="text-xs font-black text-amber-300">Vous êtes livreur ?</p>
-                <p className="text-[11px] text-slate-300">
-                  Activez votre badge VIP pour <strong>500 FCFA/semaine</strong> et restez épinglé en tête de liste !
-                </p>
-                <button
-                  onClick={() => onOpenPayment('premium_badge_week')}
-                  className="w-full py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-xs shadow hover:scale-102 transition-transform"
-                >
-                  ⭐ Activer mon Badge VIP (500F)
-                </button>
-              </div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => setCommunitySubTab('drivers')}
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+              communitySubTab === 'drivers'
+                ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/25 font-black'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            id="tab-btn-drivers-directory"
+          >
+            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+            <span>Livreurs VIP ({pinnedVipDrivers.length})</span>
+          </button>
         </div>
 
-        {/* Right Messenger-style Chat Panel (8 cols) */}
-        <div className="lg:col-span-8 flex flex-col bg-slate-900 justify-between relative">
-          
-          {/* SOURDINE ACCOUNT INACTIVE WARNING BANNER (< 50 FCFA) */}
-          {isMuted && (
-            <div className="bg-gradient-to-r from-red-950/95 via-slate-900 to-red-950/95 border-b border-red-600/70 p-3 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-red-100 shadow-xl shrink-0 z-10">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-red-900/80 border border-red-500/50 text-red-400 shrink-0">
-                  <ShieldAlert className="w-5 h-5 animate-pulse" />
+        {/* Quick action: Create Personal Chat Group */}
+        <button
+          type="button"
+          onClick={() => setShowCreateGroupModal(true)}
+          className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md hover:scale-105 transition-all"
+          id="btn-quick-create-custom-group"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Créer un Groupe</span>
+        </button>
+      </div>
+
+      {/* RENDER VIEW ACCORDING TO ACTIVE SUBTAB */}
+
+      {/* 1. MARKETPLACE MATÉRIEL INTEGRATED VIEW */}
+      {communitySubTab === 'marketplace' && (
+        <div className="space-y-4">
+          <MarketplaceAndRentals
+            marketplaceItems={marketplaceItems}
+            rentalItems={rentalItems}
+            onAddMarketplaceItem={onAddMarketplaceItem || (() => {})}
+            onAddRentalItem={onAddRentalItem || (() => {})}
+            currentUser={currentUser}
+            onOpenPayment={onOpenPayment}
+            onOpenAuth={onOpenAuth}
+            isDarkMode={isDarkMode}
+            initialTab="market"
+          />
+        </div>
+      )}
+
+      {/* 2. LOCATION VÉHICULES & TRICYCLES INTEGRATED VIEW */}
+      {communitySubTab === 'rentals' && (
+        <div className="space-y-4">
+          <MarketplaceAndRentals
+            marketplaceItems={marketplaceItems}
+            rentalItems={rentalItems}
+            onAddMarketplaceItem={onAddMarketplaceItem || (() => {})}
+            onAddRentalItem={onAddRentalItem || (() => {})}
+            currentUser={currentUser}
+            onOpenPayment={onOpenPayment}
+            onOpenAuth={onOpenAuth}
+            isDarkMode={isDarkMode}
+            initialTab="rentals"
+          />
+        </div>
+      )}
+
+      {/* 3. LIVREURS VIP DIRECTORY VIEW */}
+      {communitySubTab === 'drivers' && (
+        <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 shadow-2xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h2 className="text-xl font-black text-white flex items-center gap-2">
+                <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                <span>Annuaire des Livreurs Certifiés & VIP</span>
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Profils de chauffeurs prioritaires disponibles au Bénin et dans la sous-région
+              </p>
+            </div>
+
+            <button
+              onClick={() => onOpenPayment('premium_badge_week')}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg hover:scale-105 transition-all"
+            >
+              <Star className="w-4 h-4 fill-slate-950 text-slate-950" />
+              <span>Activer mon Badge VIP (500F/sem)</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cityDrivers.map((driver, idx) => (
+              <div
+                key={driver.id}
+                className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/50 shadow-md space-y-3 transition-all"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 font-black flex items-center justify-center text-base shadow overflow-hidden">
+                      {(driver.id === currentUser?.id ? currentUser?.avatarUrl : undefined) || driver.avatarUrl ? (
+                        <img
+                          src={(driver.id === currentUser?.id ? currentUser?.avatarUrl : undefined) || driver.avatarUrl}
+                          alt={driver.name}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span>{driver.name[0]}</span>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm text-white flex items-center gap-1.5">
+                        <span>{driver.name}</span>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      </h4>
+                      <p className="text-xs text-slate-400">📍 {driver.city}</p>
+                    </div>
+                  </div>
+
+                  {driver.hasPremiumBadge && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 shadow">
+                      ⭐ VIP
+                    </span>
+                  )}
                 </div>
+
+                <div className="text-xs text-slate-300 flex items-center justify-between pt-2 border-t border-slate-800">
+                  <span className="flex items-center gap-1 text-amber-400 font-bold">
+                    <Star className="w-3.5 h-3.5 fill-amber-400" /> {driver.rating} ({driver.completedDeliveries} courses)
+                  </span>
+                  <span className="text-slate-400 font-mono text-[11px]">{driver.vehiclePlate || 'Moto'}</span>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <a
+                    href={`tel:${driver.phone}`}
+                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center flex items-center justify-center gap-1 shadow"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Appeler</span>
+                  </a>
+                  {driver.whatsapp && (
+                    <a
+                      href={`https://wa.me/${driver.whatsapp}?text=Bonjour%20${encodeURIComponent(driver.name)},%20je%20vous%20contacte%20via%20Liencolis.`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold text-center"
+                    >
+                      WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 4. SALONS DE CHAT & GROUPES PERSONNELS VIEW */}
+      {communitySubTab === 'discussions' && (
+        <div className="bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[680px]">
+          
+          {/* Left Sidebar: City & Global Groups / Custom Personal Groups / Pinned VIP (4 cols) */}
+          <div className="lg:col-span-4 border-r border-slate-800 bg-slate-950/70 flex flex-col">
+            {/* Header with VIP Badge Trigger & Create Group */}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-black text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-emerald-400" />
+                  <span>Salons & Groupes</span>
+                </h2>
+                <p className="text-[11px] text-slate-400">Villes, Équipes & VIP Bénin</p>
+              </div>
+
+              {/* Stylized Golden Star Badge Button */}
+              <button
+                onClick={() => onOpenPayment('premium_badge_week')}
+                className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-[11px] flex items-center gap-1.5 shadow-md shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all ring-1 ring-amber-200"
+                title="Activer l'abonnement hebdomadaire de 500 FCFA pour épingler votre profil en tête de liste avec l'étoile dorée"
+                id="btn-vip-badge-header"
+              >
+                <Star className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+                <span>Badge 500F</span>
+              </button>
+            </div>
+
+            {/* 3 Sub-tabs: Villes vs Groupes Personnels vs Livreurs VIP */}
+            <div className="flex border-b border-slate-800 bg-slate-900/90 text-xs">
+              <button
+                onClick={() => setSidebarTab('city_groups')}
+                className={`flex-1 py-2.5 px-2 font-bold flex items-center justify-center gap-1 transition-colors ${
+                  sidebarTab === 'city_groups'
+                    ? 'text-amber-400 border-b-2 border-amber-400 bg-slate-800/60'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Salons officiels par villes"
+              >
+                <Globe2 className="w-3.5 h-3.5" />
+                <span className="truncate">Villes ({CITY_GROUPS.length})</span>
+              </button>
+
+              <button
+                onClick={() => setSidebarTab('custom_groups')}
+                className={`flex-1 py-2.5 px-2 font-bold flex items-center justify-center gap-1 transition-colors ${
+                  sidebarTab === 'custom_groups'
+                    ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-800/60'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Groupes personnels créés par la communauté"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span className="truncate">Équipes ({customGroups.length})</span>
+              </button>
+
+              <button
+                onClick={() => setSidebarTab('pinned_drivers')}
+                className={`flex-1 py-2.5 px-2 font-bold flex items-center justify-center gap-1 transition-colors ${
+                  sidebarTab === 'pinned_drivers'
+                    ? 'text-amber-400 border-b-2 border-amber-400 bg-slate-800/60'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Chauffeurs VIP épinglés"
+              >
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span className="truncate">VIP ({pinnedVipDrivers.length})</span>
+              </button>
+            </div>
+
+            {/* Tab 1: City & Official Groups List */}
+            {sidebarTab === 'city_groups' && (
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 scrollbar-thin">
+                {/* Pricing Info Chip */}
+                <div className="p-3 bg-gradient-to-r from-blue-950/60 to-emerald-950/60 border-b border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
+                  <span className="truncate">Abonnements villes : <strong>1200F / 1500F / 2000F</strong></span>
+                  <button
+                    onClick={() => onOpenPayment('subscription_2wheels')}
+                    className="text-amber-400 font-bold hover:underline shrink-0 ml-1"
+                  >
+                    Tarifs
+                  </button>
+                </div>
+
+                {CITY_GROUPS.map((group) => {
+                  const isSelected = group.id === selectedGroupId;
+                  return (
+                    <button
+                      key={group.id}
+                      onClick={() => {
+                        setSelectedGroupId(group.id);
+                        setModerationWarning(null);
+                      }}
+                      className={`w-full text-left p-3.5 flex items-start gap-3 transition-colors ${
+                        isSelected ? 'bg-blue-600/20 border-l-4 border-amber-400' : 'hover:bg-slate-850'
+                      }`}
+                      id={`chat-group-${group.id}`}
+                    >
+                      <div className="text-2xl shrink-0 p-1 bg-slate-800 rounded-xl">{group.flag}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-bold truncate ${isSelected ? 'text-amber-300' : 'text-slate-100'}`}>
+                            {group.name}
+                          </span>
+                          {group.isGlobal ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              GRATUIT
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">{group.memberCount} mb</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">{group.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Tab 2: Custom Personal Groups List (Groupes de conversation personnels) */}
+            {sidebarTab === 'custom_groups' && (
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 scrollbar-thin flex flex-col">
+                {/* Create Custom Group Banner */}
+                <div className="p-3 bg-gradient-to-r from-emerald-950/80 to-slate-900 border-b border-emerald-500/30 flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-black text-emerald-300 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Groupes Personnels</span>
+                    </h3>
+                    <p className="text-[10px] text-slate-400">Équipes, flottes & quartiers</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateGroupModal(true)}
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] flex items-center gap-1 shadow hover:scale-105 transition-all"
+                    id="btn-create-custom-group-sidebar"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Créer</span>
+                  </button>
+                </div>
+
+                {/* Search Bar for Custom Groups */}
+                <div className="p-2 border-b border-slate-800 bg-slate-950/50">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Rechercher une équipe..."
+                      value={customGroupSearch}
+                      onChange={(e) => setCustomGroupSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Groups List */}
+                {filteredCustomGroups.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 space-y-2">
+                    <Users className="w-8 h-8 text-slate-600 mx-auto" />
+                    <p className="text-xs font-bold text-slate-300">Aucun groupe trouvé</p>
+                    <p className="text-[11px] text-slate-500">Créez votre propre équipe ou cercle de chauffeurs</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateGroupModal(true)}
+                      className="mt-2 px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 text-xs font-bold"
+                    >
+                      + Créer le premier groupe
+                    </button>
+                  </div>
+                ) : (
+                  filteredCustomGroups.map((group) => {
+                    const isSelected = group.id === selectedGroupId;
+                    const isCreator = currentUser?.id === group.creatorId;
+                    return (
+                      <div
+                        key={group.id}
+                        onClick={() => {
+                          setSelectedGroupId(group.id);
+                          setModerationWarning(null);
+                        }}
+                        className={`w-full text-left p-3.5 flex items-start gap-3 transition-colors cursor-pointer group ${
+                          isSelected ? 'bg-emerald-950/40 border-l-4 border-emerald-400' : 'hover:bg-slate-850'
+                        }`}
+                        id={`custom-group-${group.id}`}
+                      >
+                        <div className="text-2xl shrink-0 p-1.5 bg-slate-800 rounded-xl border border-slate-700/80">
+                          {group.iconEmoji || '👥'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className={`text-xs font-black truncate ${isSelected ? 'text-emerald-300' : 'text-slate-100'}`}>
+                              {group.name}
+                            </span>
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-emerald-400 border border-emerald-500/20 shrink-0">
+                              {group.category}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5">{group.description}</p>
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+                            <span>📍 {group.city} • {group.memberCount} membres</span>
+                            {isCreator && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteCustomGroup(group.id, e)}
+                                className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 p-1 hover:bg-red-950/40 rounded transition-all"
+                                title="Supprimer ce groupe"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Pinned VIP Drivers List */}
+            {sidebarTab === 'pinned_drivers' && (
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-800/60 scrollbar-thin p-2 space-y-2">
+                <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-[11px] leading-relaxed">
+                    <strong>Livreurs VIP Épinglés :</strong> Profils prioritaires ayant activé l'abonnement hebdomadaire de <strong>500 FCFA</strong>.
+                  </div>
+                </div>
+
+                {pinnedVipDrivers.map((driver, idx) => (
+                  <div
+                    key={driver.id}
+                    className="p-3 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 border border-amber-500/40 hover:border-amber-400 shadow-md space-y-2 transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleInspectDriver(driver.id, driver.name, (driver.id === currentUser?.id ? currentUser?.avatarUrl : undefined) || driver.avatarUrl, driver.city)}
+                          className="relative group text-left cursor-pointer"
+                          title={`Voir le profil de ${driver.name}`}
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow ring-2 ring-amber-400/80 overflow-hidden group-hover:scale-105 transition-transform">
+                            {(driver.id === currentUser?.id ? currentUser?.avatarUrl : undefined) || driver.avatarUrl ? (
+                              <img
+                                src={(driver.id === currentUser?.id ? currentUser?.avatarUrl : undefined) || driver.avatarUrl}
+                                alt={driver.name}
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <span>{driver.name[0]}</span>
+                            )}
+                          </div>
+                          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[9px] font-black shadow pointer-events-none">
+                            ★
+                          </span>
+                        </button>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleInspectDriver(driver.id, driver.name, (driver.id === currentUser?.id ? currentUser?.avatarUrl : undefined) || driver.avatarUrl, driver.city)}
+                              className="text-xs font-black text-white hover:underline text-left truncate cursor-pointer"
+                              title={`Voir le profil de ${driver.name}`}
+                            >
+                              {driver.name}
+                            </button>
+                            <span className="text-emerald-400 text-xs font-bold shrink-0" title="Livreur Certifié">✓</span>
+                          </div>
+                          <p className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
+                            <Pin className="w-3 h-3 text-amber-400" />
+                            <span>#{idx + 1} Épinglé en Tête</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 shadow-sm ring-1 ring-amber-300">
+                        ⭐ VIP 500F
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-300 flex items-center justify-between pt-1 border-t border-slate-800">
+                      <span className="flex items-center gap-1 text-amber-400 font-bold">
+                        <Star className="w-3 h-3 fill-amber-400" /> {driver.rating} ({driver.completedDeliveries} courses)
+                      </span>
+                      <span className="text-slate-400">📍 {driver.city}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      {isMuted ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            alert("🔒 Action bloquée : Votre compte est en sourdine car votre solde prépayé est inférieur à 50 FCFA. Veuillez recharger votre portefeuille pour contacter les chauffeurs.");
+                            onOpenPayment('wallet_deposit_1200');
+                          }}
+                          className="w-full py-1.5 px-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-500/50 text-red-300 font-bold text-[10px] text-center flex items-center justify-center gap-1 shadow"
+                        >
+                          <Lock className="w-3 h-3 text-red-400" />
+                          <span>Sourdine - Recharger pour contacter</span>
+                        </button>
+                      ) : (
+                        <>
+                          <a
+                            href={`tel:${driver.phone}`}
+                            className="flex-1 py-1 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold text-center flex items-center justify-center gap-1"
+                          >
+                            <Phone className="w-3 h-3" />
+                            <span>Appeler</span>
+                          </a>
+                          {driver.whatsapp && (
+                            <a
+                              href={`https://wa.me/${driver.whatsapp}?text=Bonjour%20${encodeURIComponent(driver.name)},%20je%20vous%20contacte%20via%20Liencolis%20pour%20une%20livraison.`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-1 py-1 px-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold text-center"
+                            >
+                              WhatsApp
+                            </a>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Call to action for drivers */}
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-center space-y-2">
+                  <p className="text-xs font-black text-amber-300">Vous êtes livreur ?</p>
+                  <p className="text-[11px] text-slate-300">
+                    Activez votre badge VIP pour <strong>500 FCFA/semaine</strong> et restez épinglé en tête de liste !
+                  </p>
+                  <button
+                    onClick={() => onOpenPayment('premium_badge_week')}
+                    className="w-full py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-xs shadow hover:scale-102 transition-transform"
+                  >
+                    ⭐ Activer mon Badge VIP (500F)
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Messenger-style Chat Panel (8 cols) */}
+          <div className="lg:col-span-8 flex flex-col bg-slate-900 justify-between relative">
+            
+            {/* SOURDINE ACCOUNT INACTIVE WARNING BANNER (< 50 FCFA) */}
+            {isMuted && (
+              <div className="bg-gradient-to-r from-red-950/95 via-slate-900 to-red-950/95 border-b border-red-600/70 p-3 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-red-100 shadow-xl shrink-0 z-10">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-red-900/80 border border-red-500/50 text-red-400 shrink-0">
+                    <ShieldAlert className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-xs text-red-200 flex items-center gap-2">
+                      <span>COMPTE EN SOURDINE (INACTIF - SOLDE &lt; 50 FCFA)</span>
+                    </h4>
+                    <p className="text-[11px] text-red-300">
+                      Votre solde actuel est de <strong>{currentUser?.driverWallet?.balance ?? 0} FCFA</strong>. L'envoi de messages, vocaux, stickers et la participation aux discussions sont inactifs.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenPayment('wallet_deposit_1200')}
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shrink-0 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                  <span>Recharger (Dès 250 F)</span>
+                </button>
+              </div>
+            )}
+
+            {/* Active Group Header */}
+            <div className="p-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl p-1 bg-slate-800/80 rounded-2xl">{selectedGroup.flag}</div>
                 <div>
-                  <h4 className="font-black text-xs text-red-200 flex items-center gap-2">
-                    <span>COMPTE EN SOURDINE (INACTIF - SOLDE &lt; 50 FCFA)</span>
-                  </h4>
-                  <p className="text-[11px] text-red-300">
-                    Votre solde actuel est de <strong>{currentUser?.driverWallet?.balance ?? 0} FCFA</strong>. L'envoi de messages, vocaux, stickers et la participation aux discussions sont inactifs.
+                  <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    <span>{selectedGroup.name}</span>
+                    {selectedGroup.isGlobal && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        Modération Automatique 🛡️
+                      </span>
+                    )}
+                    {selectedGroup.isCustom && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        <span>Groupe Personnel</span>
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 flex items-center gap-2">
+                    <span>{selectedGroup.description}</span>
+                    {selectedGroup.isCustom && selectedGroup.customGroup?.creatorName && (
+                      <span className="text-emerald-400">• Créé par {selectedGroup.customGroup.creatorName}</span>
+                    )}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => onOpenPayment('wallet_deposit_1200')}
-                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shrink-0 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all"
-              >
-                <Zap className="w-3.5 h-3.5 fill-slate-950" />
-                <span>Recharger (Dès 250 F)</span>
-              </button>
-            </div>
-          )}
-
-          {/* Active Group Header */}
-          <div className="p-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <div className="text-3xl p-1 bg-slate-800/80 rounded-2xl">{selectedGroup.flag}</div>
-              <div>
-                <h3 className="text-sm font-black text-white flex items-center gap-2">
-                  <span>{selectedGroup.name}</span>
-                  {selectedGroup.isGlobal && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      Modération Automatique 🛡️
+              {/* Quick Actions in Header */}
+              <div className="flex items-center gap-2">
+                {currentUser && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenProfile) {
+                        onOpenProfile();
+                      } else {
+                        handleInspectDriver(currentUser.id, currentUser.name, currentUser.avatarUrl, currentUser.city);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-850 border border-slate-700/80 transition-all text-left shadow-sm group cursor-pointer"
+                    title="Voir et modifier ma photo de profil"
+                  >
+                    <div className="w-7 h-7 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-amber-400 shrink-0 ring-1 ring-slate-700">
+                      {currentUser.avatarUrl ? (
+                        <img
+                          src={currentUser.avatarUrl}
+                          alt={currentUser.name}
+                          className="w-full h-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span>{currentUser.name?.[0] || 'U'}</span>
+                      )}
+                    </div>
+                    <span className="hidden sm:inline text-xs font-bold text-slate-200 group-hover:text-amber-300 transition-colors">
+                      Mon Profil
                     </span>
-                  )}
-                </h3>
-                <p className="text-[11px] text-slate-400 flex items-center gap-2">
-                  <span>{selectedGroup.description}</span>
-                </p>
+                  </button>
+                )}
+
+                {/* Talkie-Walkie CB Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowWalkieTalkieModal(true)}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-slate-800 hover:bg-slate-750 text-amber-300 border border-amber-500/40 shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Ouvrir le Talkie-Walkie CB & Notes Vocales Rapides"
+                  id="btn-open-walkie-talkie-header"
+                >
+                  <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  <span className="hidden md:inline">Talkie CB</span>
+                </button>
+
+                {/* GPS Live Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowLiveLocationModal(true)}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-black bg-slate-800 hover:bg-slate-750 text-emerald-300 border border-emerald-500/40 shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Partager ma position GPS en direct ou fixe"
+                  id="btn-open-live-gps-header"
+                >
+                  <Navigation className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400" />
+                  <span className="hidden md:inline">GPS Live</span>
+                </button>
+
+                <button
+                  onClick={() => onOpenPayment('premium_badge_week')}
+                  className="px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 border border-amber-300 shadow-md shadow-amber-500/20 flex items-center gap-1.5 hover:scale-105 transition-all"
+                  title="Abonnement hebdomadaire 500 FCFA : Profil épinglé en haut de la liste avec étoile dorée"
+                  id="btn-open-payment-vip"
+                >
+                  <Star className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+                  <span className="hidden sm:inline">Badge VIP (500F/sem)</span>
+                  <span className="sm:hidden">VIP 500F</span>
+                </button>
               </div>
             </div>
 
-            {/* Quick Actions in Header: VIP Badge Button */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowVipInfoModal(true)}
-                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs"
-                title="Informations sur le badge VIP et le profil épinglé"
-              >
-                <Info className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => onOpenPayment('premium_badge_week')}
-                className="px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 border border-amber-300 shadow-md shadow-amber-500/20 flex items-center gap-1.5 hover:scale-105 transition-all"
-                title="Abonnement hebdomadaire 500 FCFA : Profil épinglé en haut de la liste avec étoile dorée"
-                id="btn-open-payment-vip"
-              >
-                <Star className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
-                <span className="hidden sm:inline">Badge VIP (500F/sem)</span>
-                <span className="sm:hidden">VIP 500F</span>
-              </button>
-            </div>
-          </div>
+            {/* Custom Group Pinned Notice (if applicable) */}
+            {selectedGroup.isCustom && selectedGroup.customGroup?.pinnedNotice && (
+              <div className="bg-emerald-950/40 border-b border-emerald-500/30 px-4 py-2 flex items-center justify-between text-xs text-emerald-200">
+                <div className="flex items-center gap-2">
+                  <Pin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span><strong>Annonce du groupe :</strong> {selectedGroup.customGroup.pinnedNotice}</span>
+                </div>
+                {currentUser && (
+                  <button
+                    type="button"
+                    onClick={() => handleJoinOrLeaveGroup(selectedGroup.id)}
+                    className="text-[11px] font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800"
+                  >
+                    {selectedGroup.customGroup.members?.includes(currentUser.id) ? 'Quitter' : 'Rejoindre'}
+                  </button>
+                )}
+              </div>
+            )}
 
           {/* TOP PINNED DRIVERS ROSTER (500 FCFA/week Subscription) */}
           <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/40 border-b border-amber-500/30 p-3">
@@ -876,6 +1641,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
                 {pinnedVipDrivers.slice(0, 3).map((driver, idx) => {
                   const isCurrentLoggedUser = currentUser?.id === driver.id;
+                  const displayAvatar = (isCurrentLoggedUser ? currentUser?.avatarUrl : undefined) || driver.avatarUrl;
                   return (
                     <div
                       key={driver.id}
@@ -887,19 +1653,40 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="relative">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black flex items-center justify-center text-xs shadow ring-1 ring-amber-300">
-                              {driver.name[0]}
+                          <button
+                            type="button"
+                            onClick={() => handleInspectDriver(driver.id, driver.name, displayAvatar, driver.city)}
+                            className="relative group text-left cursor-pointer"
+                            title={`Voir le profil de ${driver.name}`}
+                          >
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black flex items-center justify-center text-xs shadow ring-1 ring-amber-300 overflow-hidden group-hover:scale-105 transition-transform">
+                              {displayAvatar ? (
+                                <img
+                                  src={displayAvatar}
+                                  alt={driver.name}
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                driver.name[0]
+                              )}
                             </div>
-                            <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[8px] font-black shadow">
+                            <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[8px] font-black shadow pointer-events-none">
                               ★
                             </span>
-                          </div>
+                          </button>
 
                           <div className="min-w-0">
                             <div className="flex items-center gap-1">
-                              <p className="text-xs font-black text-white truncate">{driver.name}</p>
-                              <span className="text-emerald-400 text-[11px] font-bold">✓</span>
+                              <button
+                                type="button"
+                                onClick={() => handleInspectDriver(driver.id, driver.name, displayAvatar, driver.city)}
+                                className="text-xs font-black text-white hover:underline text-left truncate cursor-pointer"
+                                title={`Voir le profil de ${driver.name}`}
+                              >
+                                {driver.name}
+                              </button>
+                              <span className="text-emerald-400 text-[11px] font-bold shrink-0">✓</span>
                             </div>
                             <p className="text-[10px] text-amber-300 font-bold flex items-center gap-0.5">
                               <Pin className="w-2.5 h-2.5 text-amber-400" />
@@ -1023,17 +1810,31 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                   >
                     {/* User Avatar with Profile Photo */}
                     <div className="shrink-0 relative mt-0.5">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shadow overflow-hidden ${
-                        msg.hasPremiumBadge
-                          ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 ring-2 ring-amber-400'
-                          : isMe
-                          ? 'bg-blue-600 text-white ring-1 ring-blue-400/60'
-                          : 'bg-slate-800 text-slate-200 border border-slate-700'
-                      }`}>
-                        {msg.senderName.slice(0, 2).toUpperCase()}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleInspectDriver(msg.senderId, msg.senderName, msg.senderAvatar || (isMe ? currentUser?.avatarUrl : undefined), msg.senderCity)}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shadow overflow-hidden transition-transform hover:scale-105 cursor-pointer ${
+                          msg.hasPremiumBadge
+                            ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 ring-2 ring-amber-400'
+                            : isMe
+                            ? 'bg-blue-600 text-white ring-1 ring-blue-400/60'
+                            : 'bg-slate-800 text-slate-200 border border-slate-700'
+                        }`}
+                        title={`Voir le profil de ${msg.senderName}`}
+                      >
+                        {msg.senderAvatar || (isMe && currentUser?.avatarUrl) ? (
+                          <img
+                            src={msg.senderAvatar || (isMe ? currentUser?.avatarUrl : undefined)}
+                            alt={msg.senderName}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <span>{msg.senderName.slice(0, 2).toUpperCase()}</span>
+                        )}
+                      </button>
                       {msg.hasPremiumBadge && (
-                        <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[8px] font-black shadow">
+                        <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[8px] font-black shadow pointer-events-none">
                           ★
                         </span>
                       )}
@@ -1042,9 +1843,14 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                     <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-md space-y-1`}>
                       {/* Sender Identity & Metadata with STYLIZED GOLDEN STAR BADGE */}
                       <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400 px-1">
-                        <span className={`font-bold ${msg.hasPremiumBadge ? 'text-amber-300' : 'text-slate-300'}`}>
+                        <button
+                          type="button"
+                          onClick={() => handleInspectDriver(msg.senderId, msg.senderName, msg.senderAvatar || (isMe ? currentUser?.avatarUrl : undefined), msg.senderCity)}
+                          className={`font-bold hover:underline text-left cursor-pointer transition-colors ${msg.hasPremiumBadge ? 'text-amber-300' : 'text-slate-300'}`}
+                          title={`Voir le profil de ${msg.senderName}`}
+                        >
                           {msg.senderName}
-                        </span>
+                        </button>
 
                         {msg.senderCity && (
                           <span className="text-slate-500">📍 {msg.senderCity}</span>
@@ -1081,36 +1887,71 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                             : 'bg-slate-800 border border-slate-700/80 text-slate-100 rounded-tl-none'
                         }`}
                       >
-                        {/* Audio Voice Player */}
-                        {msg.audioUrl ? (
-                          <div className="flex items-center gap-3 py-1">
-                            <button
-                              onClick={() => {
-                                if (playingAudioId === msg.id) {
-                                  setPlayingAudioId(null);
-                                } else {
-                                  setPlayingAudioId(msg.id);
-                                  setTimeout(() => setPlayingAudioId(null), (msg.audioDurationSeconds || 3) * 1000);
-                                }
+                        {/* Live Location Card Render */}
+                        {msg.location ? (
+                          <div className="py-1">
+                            <LiveLocationCard
+                              location={msg.location}
+                              senderName={msg.senderName}
+                              senderAvatar={msg.senderAvatar}
+                              isMe={isMe}
+                              onStopLive={() => {
+                                onSendMessage({
+                                  id: `msg_loc_stop_${Date.now()}`,
+                                  groupId: selectedGroupId,
+                                  senderId: currentUser?.id || 'usr_driver_01',
+                                  senderName: currentUser?.name || 'Germain Mensah',
+                                  senderRole: currentUser?.role || 'driver',
+                                  senderCity: currentUser?.city || selectedGroup.name,
+                                  senderAvatar: currentUser?.avatarUrl,
+                                  isDriverCertified: true,
+                                  content: '🛑 Partage de position en direct arrêté.',
+                                  timestamp: new Date().toISOString(),
+                                });
                               }}
-                              className={`p-2 rounded-full shadow ${
-                                playingAudioId === msg.id ? 'bg-amber-400 text-slate-950' : 'bg-slate-900 text-white'
-                              }`}
-                            >
-                              {playingAudioId === msg.id ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                            </button>
-                            <div className="flex-1 min-w-[120px]">
-                              <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
-                                <div
-                                  className={`h-full bg-amber-400 transition-all ${
-                                    playingAudioId === msg.id ? 'w-full duration-3000' : 'w-1/3'
-                                  }`}
-                                ></div>
+                            />
+                            {msg.content && !msg.content.startsWith('📍') && (
+                              <p className="mt-2 leading-relaxed whitespace-pre-wrap text-[13px]">{msg.content}</p>
+                            )}
+                          </div>
+                        ) : msg.audioUrl || msg.isWalkieTalkie ? (
+                          /* Audio Voice / Walkie-Talkie Player */
+                          <div className="space-y-1.5 py-1">
+                            {msg.isWalkieTalkie && (
+                              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 font-mono text-[10px] font-black border border-amber-400/30 w-fit">
+                                <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
+                                <span>CANAL RADIO CB</span>
                               </div>
-                              <span className="text-[10px] text-slate-300 font-mono mt-1 block">
-                                Message Vocal ({msg.audioDurationSeconds || 3}s)
-                              </span>
+                            )}
+
+                            <div className="flex items-center gap-3 py-1">
+                              <button
+                                onClick={() => handleToggleAudio(msg)}
+                                className={`p-2 rounded-full shadow transition-transform active:scale-95 cursor-pointer ${
+                                  playingAudioId === msg.id ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300' : 'bg-slate-900 text-white hover:bg-slate-850'
+                                }`}
+                              >
+                                {playingAudioId === msg.id ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                              </button>
+                              <div className="flex-1 min-w-[120px]">
+                                <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+                                  <div
+                                    className={`h-full bg-amber-400 transition-all ${
+                                      playingAudioId === msg.id ? 'w-full duration-3000' : 'w-1/3'
+                                    }`}
+                                  ></div>
+                                </div>
+                                <span className="text-[10px] text-slate-300 font-mono mt-1 block">
+                                  {msg.isWalkieTalkie ? 'Radio CB' : 'Message Vocal'} ({msg.audioDurationSeconds || 3}s)
+                                </span>
+                              </div>
                             </div>
+
+                            {msg.content && !msg.content.startsWith('🎙️') && (
+                              <p className="leading-relaxed whitespace-pre-wrap text-[13px] text-slate-200 mt-1">
+                                {msg.content}
+                              </p>
+                            )}
                           </div>
                         ) : msg.stickerId || msg.content.includes('[STICKER]') ? (
                           /* Graphical Driver Sticker Card */
@@ -1334,6 +2175,28 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                   {/* Media, Camera and Voice buttons (in City Groups) */}
                   {!selectedGroup.isGlobal ? (
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Talkie-Walkie CB Radio Modal Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setShowWalkieTalkieModal(true)}
+                        className="p-2.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 transition-colors shadow-sm cursor-pointer"
+                        title="Talkie-Walkie CB & Alertes Rapides Guidon"
+                        id="btn-walkie-talkie-chat"
+                      >
+                        <Radio className="w-4 h-4" />
+                      </button>
+
+                      {/* GPS Live Sharing Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setShowLiveLocationModal(true)}
+                        className="p-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-colors shadow-sm cursor-pointer"
+                        title="Partager ma position GPS en direct ou repère"
+                        id="btn-share-gps-chat"
+                      >
+                        <Navigation className="w-4 h-4 fill-emerald-400 text-emerald-400" />
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => setIsRecordingVoice(true)}
@@ -1437,6 +2300,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
         </div>
 
       </div>
+      )}
 
       {/* VIP Badge Info Modal */}
       {showVipInfoModal && (
@@ -1508,16 +2372,256 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
         </div>
       )}
 
-      {/* Camera Photo Capture Modal for Group Chat */}
+      {/* Inspected Driver / Member Profile Modal in Community */}
+      {inspectedDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">Profil dans la Communauté</h3>
+                  <p className="text-[11px] text-slate-400">Liencolis Réseau Conducteurs & Membres</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectedDriver(null)}
+                className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Profile Avatar & Hero Information */}
+            <div className="flex flex-col items-center text-center space-y-3 pt-2">
+              <div className="relative">
+                <div className={`w-24 h-24 rounded-3xl overflow-hidden shadow-xl flex items-center justify-center font-black text-2xl ${
+                  inspectedDriver.hasPremiumBadge
+                    ? 'ring-4 ring-amber-400/80 bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950'
+                    : 'ring-2 ring-slate-700 bg-slate-800 text-slate-200'
+                }`}>
+                  {inspectedDriver.avatarUrl ? (
+                    <img
+                      src={inspectedDriver.avatarUrl}
+                      alt={inspectedDriver.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span>{inspectedDriver.name.slice(0, 2).toUpperCase()}</span>
+                  )}
+                </div>
+
+                {inspectedDriver.hasPremiumBadge && (
+                  <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black text-[10px] shadow-lg ring-2 ring-slate-900 flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-slate-950" />
+                    <span>VIP</span>
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-center gap-1.5">
+                  <h4 className="text-base font-black text-white">{inspectedDriver.name}</h4>
+                  {inspectedDriver.isCertified && (
+                    <span className="text-emerald-400 font-black text-sm" title="Livreur Certifié Officiel">✓</span>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-400 flex items-center justify-center gap-1 mt-0.5">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>{inspectedDriver.city || 'Cotonou, Bénin'}</span>
+                </p>
+
+                {inspectedDriver.statusText && (
+                  <p className="text-[11px] text-slate-300 bg-slate-800/80 px-3 py-1 rounded-full border border-slate-700/60 inline-block mt-2">
+                    {inspectedDriver.statusText}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* If inspecting SELF: Photo Change & Profile Options */}
+            {inspectedDriver.id === currentUser?.id && (
+              <div className="p-3 rounded-2xl bg-blue-950/40 border border-blue-500/30 space-y-2 text-center">
+                <p className="text-xs font-bold text-blue-300">C'est votre profil affiché aux autres membres</p>
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUpdatingSelfAvatar(true);
+                      setShowCameraModal(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Prendre photo</span>
+                  </button>
+
+                  <label className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow">
+                    <Image className="w-3.5 h-3.5" />
+                    <span>Importer</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const newPhoto = reader.result as string;
+                            if (currentUser) {
+                              const updated: UserProfile = { ...currentUser, avatarUrl: newPhoto };
+                              storageService.setUser(updated);
+                              if (onUpdateUser) onUpdateUser(updated);
+                              setInspectedDriver((prev) => prev ? { ...prev, avatarUrl: newPhoto } : null);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Performance Stats & Details */}
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="p-2.5 rounded-2xl bg-slate-800/80 border border-slate-700/80">
+                <div className="flex items-center justify-center gap-1 text-amber-400 font-black text-sm">
+                  <Star className="w-4 h-4 fill-amber-400" />
+                  <span>{inspectedDriver.rating.toFixed(1)} / 5</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">{inspectedDriver.totalRatingsCount} avis clients</p>
+              </div>
+
+              <div className="p-2.5 rounded-2xl bg-slate-800/80 border border-slate-700/80">
+                <div className="text-sm font-black text-emerald-400">
+                  {inspectedDriver.completedDeliveries} courses
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">Livraisons réussies</p>
+              </div>
+            </div>
+
+            {/* Vehicle Info */}
+            <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/80 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <Bike className="w-4 h-4 text-amber-400" />
+                <span className="text-slate-300">
+                  {inspectedDriver.vehicleType === 'tricycle' ? 'Tricycle cargo' : inspectedDriver.vehicleType === 'car_4wheels' ? 'Véhicule 4 roues' : 'Moto 2 roues'}
+                </span>
+              </div>
+              <span className="font-mono text-[11px] font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800">
+                {inspectedDriver.vehiclePlate || 'BJ-OFFICIEL'}
+              </span>
+            </div>
+
+            {/* Contact Actions */}
+            <div className="pt-2 space-y-2">
+              <div className="flex items-center gap-2">
+                <a
+                  href={`tel:${inspectedDriver.phone}`}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center flex items-center justify-center gap-1.5 shadow"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>Appeler</span>
+                </a>
+
+                {inspectedDriver.whatsapp && (
+                  <a
+                    href={`https://wa.me/${inspectedDriver.whatsapp}?text=Bonjour%20${encodeURIComponent(inspectedDriver.name)},%20je%20vous%20contacte%20depuis%20la%20communauté%20Liencolis.`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold text-center flex items-center justify-center gap-1.5"
+                  >
+                    <span>WhatsApp</span>
+                  </a>
+                )}
+              </div>
+
+              {inspectedDriver.id === currentUser?.id && onOpenProfile && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInspectedDriver(null);
+                    onOpenProfile();
+                  }}
+                  className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700"
+                >
+                  Gérer mon compte complet & KYC
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setInspectedDriver(null)}
+                className="w-full py-2 rounded-xl bg-slate-800/80 text-slate-400 text-xs font-bold hover:bg-slate-800"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera Photo Capture Modal for Group Chat & Profile */}
       <CameraCaptureModal
         isOpen={showCameraModal}
-        onClose={() => setShowCameraModal(false)}
-        title="Photo pour le Salon de Discussion"
-        description="Prenez une photo en direct de l'état de la route, d'un colis ou du matériel"
+        onClose={() => {
+          setShowCameraModal(false);
+          setIsUpdatingSelfAvatar(false);
+        }}
+        title={isUpdatingSelfAvatar ? "Photo de Profil Communauté" : "Photo pour le Salon de Discussion"}
+        description={isUpdatingSelfAvatar ? "Prenez une photo en direct pour mettre à jour votre profil dans les communautés" : "Prenez une photo en direct de l'état de la route, d'un colis ou du matériel"}
         onCapture={(photoUrl) => {
-          setSelectedMediaUrl(photoUrl);
+          if (isUpdatingSelfAvatar) {
+            if (currentUser) {
+              const updated: UserProfile = { ...currentUser, avatarUrl: photoUrl };
+              storageService.setUser(updated);
+              if (onUpdateUser) onUpdateUser(updated);
+              setInspectedDriver((prev) => prev ? { ...prev, avatarUrl: photoUrl } : null);
+            }
+            setIsUpdatingSelfAvatar(false);
+          } else {
+            setSelectedMediaUrl(photoUrl);
+          }
           setShowCameraModal(false);
         }}
+      />
+
+      {/* Live GPS Location Sharing Modal */}
+      <LiveLocationShareModal
+        isOpen={showLiveLocationModal}
+        onClose={() => setShowLiveLocationModal(false)}
+        currentUser={currentUser}
+        selectedCityName={selectedGroup.name}
+        onShareLocation={handleShareLiveLocation}
+      />
+
+      {/* Talkie-Walkie CB Push-To-Talk Radio Modal */}
+      <WalkieTalkieModal
+        isOpen={showWalkieTalkieModal}
+        onClose={() => setShowWalkieTalkieModal(false)}
+        currentUser={currentUser}
+        selectedCityName={selectedGroup.name}
+        selectedGroupId={selectedGroupId}
+        onSendVoiceMessage={handleSendWalkieTalkieMessage}
+        autoPlayIncomingAudio={autoPlayIncomingAudio}
+        onToggleAutoPlayIncomingAudio={handleToggleAutoPlayIncomingAudio}
+      />
+
+      {/* Create Custom Group Modal (Groupes de conversation personnels) */}
+      <CreateCustomGroupModal
+        isOpen={showCreateGroupModal}
+        onClose={() => setShowCreateGroupModal(false)}
+        currentUser={currentUser}
+        onGroupCreated={handleCustomGroupCreated}
+        onOpenAuth={onOpenAuth}
       />
     </div>
   );

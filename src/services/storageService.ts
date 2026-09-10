@@ -17,6 +17,9 @@ import {
   PlatformTreasury,
   TontineCycle,
   TontineMember,
+  DirectConversation,
+  DirectConversationMessage,
+  CustomChatGroup,
 } from '../types';
 import { SmtpConfig } from './smtpValidator';
 
@@ -30,6 +33,9 @@ const STORAGE_KEYS = {
   TONTINE_CYCLES: 'liencolis_tontine_cycles',
   MARKETPLACE: 'liencolis_marketplace',
   RENTALS: 'liencolis_rentals',
+  CUSTOM_GROUPS: 'liencolis_custom_chat_groups',
+  CONVERSATIONS: 'liencolis_direct_conversations',
+  CONVERSATION_MESSAGES: 'liencolis_conversation_messages',
   TRANSACTIONS: 'liencolis_transactions',
   ADMIN_SUMMARIES: 'liencolis_admin_summaries',
   PLATFORM_WITHDRAWALS: 'liencolis_platform_withdrawals',
@@ -190,6 +196,7 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderName: 'Liencolis Modération 🛡️',
     senderRole: 'admin',
     senderCity: 'Cotonou',
+    senderAvatar: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=128&q=80',
     content: 'Bienvenue dans le Grand Groupe Liencolis Driver Community ! Rappel : Aucun partage de lien web, ni de numéro de téléphone direct, ni de message inapproprié. Respectons les règles de la communauté.',
     timestamp: new Date(Date.now() - 180 * 60000).toISOString(),
   },
@@ -200,6 +207,7 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderName: 'Paul A. (Livreur Cotonou)',
     senderRole: 'driver',
     senderCity: 'Cotonou',
+    senderAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=128&q=80',
     isDriverCertified: true,
     content: 'Bonne journée à toute la famille des livreurs ! N’oubliez pas de porter vos casques et de vérifier la pression de vos pneus.',
     timestamp: new Date(Date.now() - 95 * 60000).toISOString(),
@@ -211,6 +219,7 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderName: 'Sèna E-commerce',
     senderRole: 'merchant',
     senderCity: 'Abomey-Calavi',
+    senderAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=128&q=80',
     content: 'Merci aux livreurs sérieux de Liencolis pour leur ponctualité ce matin.',
     timestamp: new Date(Date.now() - 40 * 60000).toISOString(),
   },
@@ -223,6 +232,7 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderName: 'Support Liencolis',
     senderRole: 'driver',
     senderCity: 'Cotonou',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=128&q=80',
     isDriverCertified: true,
     hasPremiumBadge: false,
     content: 'Attention les collègues, travaux de voirie en cours au Carrefour Vèdoko direction Étoile Rouge, prévoyez de passer par Sainte Rita.',
@@ -235,9 +245,47 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderName: 'Marc Houndégbé',
     senderRole: 'driver',
     senderCity: 'Cotonou',
+    senderAvatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=128&q=80',
     isDriverCertified: true,
     content: 'Bien reçu cher collègue ! Merci pour l’info trafic.',
     timestamp: new Date(Date.now() - 14 * 60000).toISOString(),
+  },
+  {
+    id: 'msg_c_live_loc',
+    groupId: 'cotonou',
+    senderId: 'usr_02',
+    senderName: 'Paul A. (Livreur Cotonou)',
+    senderRole: 'driver',
+    senderCity: 'Cotonou',
+    senderAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=128&q=80',
+    isDriverCertified: true,
+    hasPremiumBadge: true,
+    content: '📍 Posté au Carrefour Ganhi, disponible pour relais express vers Haie Vive ou Akpakpa.',
+    location: {
+      latitude: 6.3571,
+      longitude: 2.4344,
+      landmark: 'Ganhi - Quartier Commercial',
+      address: 'Carrefour Ganhi, Cotonou, Bénin',
+      isLive: true,
+      durationMinutes: 30,
+      expiresAt: new Date(Date.now() + 22 * 60000).toISOString(),
+      accuracyMeters: 12,
+    },
+    timestamp: new Date(Date.now() - 8 * 60000).toISOString(),
+  },
+  {
+    id: 'msg_c_radio_alert',
+    groupId: 'cotonou',
+    senderId: 'usr_04',
+    senderName: 'Marc Houndégbé',
+    senderRole: 'driver',
+    senderCity: 'Cotonou',
+    senderAvatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=128&q=80',
+    isDriverCertified: true,
+    isWalkieTalkie: true,
+    audioDurationSeconds: 4,
+    content: '🚨 ALERTE TRAFIC : Gros bouchon signalé, circulation ralentie autour de l’Étoile Rouge. Déviation conseillée.',
+    timestamp: new Date(Date.now() - 3 * 60000).toISOString(),
   },
 
   // Groupe Abomey-Calavi
@@ -248,6 +296,7 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderName: 'Fabrice Dossou',
     senderRole: 'driver',
     senderCity: 'Abomey-Calavi',
+    senderAvatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=128&q=80',
     isDriverCertified: true,
     content: 'Disponible sur la zone Arconville et Zogbadjè pour toutes courses urgentes.',
     timestamp: new Date(Date.now() - 35 * 60000).toISOString(),
@@ -261,6 +310,7 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
     senderName: 'Alain Houénou',
     senderRole: 'driver',
     senderCity: 'Porto-Novo',
+    senderAvatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=128&q=80',
     isDriverCertified: true,
     content: 'Salut les frères de la capitale ! Le temps est clair, bonne route à tous.',
     timestamp: new Date(Date.now() - 50 * 60000).toISOString(),
@@ -350,46 +400,92 @@ const DEFAULT_ADS: ClassifiedAd[] = [
 const DEFAULT_MARKETPLACE: MarketplaceItem[] = [
   {
     id: 'mkt_001',
-    title: 'Support Téléphone Étanche Guidon Moto avec Chargeur USB',
-    description: 'Protection anti-pluie et anti-vibrations 360°, parfait pour la navigation GPS sous le soleil et la pluie de Cotonou.',
+    title: 'Support Téléphone Étanche Guidon Moto avec Chargeur USB 3.0',
+    description: 'Protection anti-pluie et anti-vibrations 360°, rotule en aluminium robuste. Idéal pour la navigation GPS continue sous la chaleur ou les averses tropicales à Cotonou et Calavi.',
     price: 6500,
     condition: 'new',
     category: 'gps_mount',
     imageUrl: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1508974239320-0a029497e820?w=600&auto=format&fit=crop&q=80',
+    ],
     sellerId: 'usr_02',
     sellerName: 'Paul A.',
     sellerPhone: '+229 97 45 67 89',
     sellerCity: 'Cotonou',
+    sellerCountry: 'Bénin',
+    sellerCountryCode: 'BJ',
+    sellerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
     isSold: false,
     createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
   },
   {
     id: 'mkt_002',
-    title: 'Sac à Dos Isotherme de Livraison Grande Capacité 48L',
-    description: 'Maintient chaud et froid jusqu’à 5 heures. Bandes réfléchissantes de sécurité haute visibilité.',
+    title: 'Sac à Dos Isotherme de Livraison Pro 48L Haute Sécurité',
+    description: 'Isolation thermique multicouche (maintient chaud et froid jusqu’à 5h). Bandes rétro-réfléchissantes 3M, sangles pectorales ergonomiques et séparateur amovible de colis.',
     price: 18000,
     condition: 'new',
     category: 'delivery_bag',
     imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&auto=format&fit=crop&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1622560480605-d83c853bc5c3?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1546938576-6e6a64f317cc?w=600&auto=format&fit=crop&q=80',
+    ],
     sellerId: 'usr_03',
     sellerName: 'Sèna Equipements',
     sellerPhone: '+229 96 22 33 44',
     sellerCity: 'Abomey-Calavi',
+    sellerCountry: 'Bénin',
+    sellerCountryCode: 'BJ',
+    sellerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
     isSold: false,
     createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
   },
   {
     id: 'mkt_003',
-    title: 'Gilet Haute Visibilité Réfléchissant Renforcé',
-    description: 'Norme de sécurité routière avec poches frontales pour téléphone et carnet de livraison.',
+    title: 'Casque Moto Intégral Homologué DOT avec Visière Anti-Rayures',
+    description: 'Aération dynamique, boucle micrométrique rapide, intérieur lavable et anti-transpirant. Conforme aux règles de sécurité Liencolis.',
+    price: 14500,
+    condition: 'new',
+    category: 'helmet',
+    imageUrl: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=600&auto=format&fit=crop&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
+    ],
+    sellerId: 'usr_04',
+    sellerName: 'Bénin Moto Pièces',
+    sellerPhone: '+229 95 12 34 56',
+    sellerCity: 'Porto-Novo',
+    sellerCountry: 'Bénin',
+    sellerCountryCode: 'BJ',
+    sellerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
+    isSold: false,
+    createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+  },
+  {
+    id: 'mkt_004',
+    title: 'Gilet Haute Visibilité Réfléchissant Renforcé Chauffeur Pro',
+    description: 'Norme de sécurité routière avec 4 poches frontales pour smartphone, carnet de livraison et stylos. Fermeture éclair robuste.',
     price: 3500,
     condition: 'new',
     category: 'jacket',
     imageUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&auto=format&fit=crop&q=80',
+    ],
     sellerId: 'usr_driver_01',
     sellerName: 'Germain Mensah',
     sellerPhone: '+229 01 69 81 46 31',
     sellerCity: 'Cotonou',
+    sellerCountry: 'Bénin',
+    sellerCountryCode: 'BJ',
+    sellerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
     isSold: false,
     createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
@@ -403,40 +499,277 @@ const DEFAULT_RENTALS: RentalItem[] = [
     dailyPrice: 3000,
     weeklyPrice: 18000,
     city: 'Cotonou',
+    country: 'Bénin',
+    countryCode: 'BJ',
     imageUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&auto=format&fit=crop&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=600&auto=format&fit=crop&q=80',
+    ],
+    ownerId: 'usr_owner_01',
     ownerName: 'Garage Pro Moto Bénin',
     ownerPhone: '+229 97 10 20 30',
     ownerWhatsapp: '+22997102030',
+    ownerAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80',
     isAvailable: true,
-    description: 'Parfait état, pneus neufs, assurance et visite technique à jour. Idéale pour livraisons intenses.',
+    description: 'Parfait état mécanique, consommation minime (1.9L/100km). Pneus neufs, assurance et visite technique à jour. 1 casque fourni.',
+    depositAmount: 10000,
+    specs: {
+      payloadCapacityKg: 150,
+      fuelType: 'essence',
+      mileageKm: 14200,
+      hasHelmetIncluded: true,
+      hasInsurance: true,
+      hasLockIncluded: true,
+    },
+    createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
   },
   {
     id: 'rnt_002',
-    title: 'Tricycle Cargo Dayang 200cc avec Toit de Protection',
+    title: 'Tricycle Cargo Dayang 200cc avec Toit & Benne Renforcée',
     vehicleType: 'tricycle',
     dailyPrice: 7000,
     weeklyPrice: 42000,
     city: 'Abomey-Calavi',
+    country: 'Bénin',
+    countryCode: 'BJ',
     imageUrl: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600&auto=format&fit=crop&q=80',
-    ownerName: 'M. Saliou B.',
+    images: [
+      'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1596524430615-b46475ddff6e?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=600&auto=format&fit=crop&q=80',
+    ],
+    ownerId: 'usr_owner_02',
+    ownerName: 'M. Saliou B. (Flotte Calavi)',
     ownerPhone: '+229 96 55 44 33',
     ownerWhatsapp: '+22996554433',
+    ownerAvatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80',
     isAvailable: true,
-    description: 'Grande benne renforcée, supporte jusqu’à 800 kg de marchandises, cartons et vivres.',
+    description: 'Grande benne renforcée de 2m x 1.3m, supporte jusqu’à 800 kg de marchandises, cartons, sacs de ciment et vivres. Moteur 200cc refroidi par eau.',
+    depositAmount: 20000,
+    specs: {
+      payloadCapacityKg: 800,
+      fuelType: 'essence',
+      mileageKm: 28900,
+      hasHelmetIncluded: true,
+      hasInsurance: true,
+      hasLockIncluded: true,
+    },
+    createdAt: new Date(Date.now() - 6 * 86400000).toISOString(),
   },
   {
     id: 'rnt_003',
-    title: 'Camionnette Suzuki Carry Utilitaires Express',
+    title: 'Camionnette Suzuki Carry Utilitaires Express Bâchée',
     vehicleType: 'car_4wheels',
     dailyPrice: 15000,
     weeklyPrice: 90000,
     city: 'Porto-Novo',
+    country: 'Bénin',
+    countryCode: 'BJ',
     imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=600&auto=format&fit=crop&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600&auto=format&fit=crop&q=80',
+    ],
+    ownerId: 'usr_owner_03',
     ownerName: 'Express Cargo Bénin',
     ownerPhone: '+229 95 88 99 00',
     ownerWhatsapp: '+22995889900',
+    ownerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
     isAvailable: true,
-    description: 'Pour déménagements et grosses cargaisons interurbaines Cotonou - Porto-Novo - Parakou.',
+    description: 'Pour déménagements et grosses cargaisons interurbaines Cotonou - Porto-Novo - Parakou. Bâche étanche amovible incluse.',
+    depositAmount: 50000,
+    specs: {
+      payloadCapacityKg: 1200,
+      fuelType: 'essence',
+      mileageKm: 65000,
+      hasHelmetIncluded: false,
+      hasInsurance: true,
+      hasLockIncluded: true,
+    },
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+];
+
+const DEFAULT_CONVERSATIONS: DirectConversation[] = [
+  {
+    id: 'conv_mkt_001',
+    targetType: 'marketplace',
+    itemId: 'mkt_001',
+    itemTitle: 'Support Téléphone Étanche Guidon Moto avec Chargeur USB 3.0',
+    itemPrice: 6500,
+    itemPriceType: 'fixed',
+    itemImageUrl: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80',
+    itemSecondaryInfo: 'Cotonou • Vendeur vérifié',
+    sellerOrOwnerId: 'usr_02',
+    sellerOrOwnerName: 'Paul A.',
+    sellerOrOwnerPhone: '+229 97 45 67 89',
+    sellerOrOwnerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+    buyerOrRenterId: 'usr_driver_01',
+    buyerOrRenterName: 'Utilisateur Demo',
+    buyerOrRenterPhone: '+229 00 00 00 00',
+    buyerOrRenterAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+    lastMessageText: 'Oui le support est disponible, je peux vous le livrer cet après-midi au carrefour Vedoko.',
+    lastMessageTimestamp: new Date(Date.now() - 25 * 60000).toISOString(),
+    unreadCountForBuyer: 1,
+    unreadCountForSeller: 0,
+    status: 'active',
+    createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+  {
+    id: 'conv_rnt_002',
+    targetType: 'rental',
+    itemId: 'rnt_002',
+    itemTitle: 'Tricycle Cargo Dayang 200cc avec Toit & Benne Renforcée',
+    itemPrice: 7000,
+    itemPriceType: 'per_day',
+    itemImageUrl: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600&auto=format&fit=crop&q=80',
+    itemSecondaryInfo: 'Abomey-Calavi • 800 kg charge max',
+    sellerOrOwnerId: 'usr_owner_02',
+    sellerOrOwnerName: 'M. Saliou B. (Flotte Calavi)',
+    sellerOrOwnerPhone: '+229 96 55 44 33',
+    sellerOrOwnerAvatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80',
+    buyerOrRenterId: 'usr_driver_01',
+    buyerOrRenterName: 'Utilisateur Demo',
+    buyerOrRenterPhone: '+229 00 00 00 00',
+    buyerOrRenterAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+    lastMessageText: 'Demande de location pour 2 jours acceptée. Rendez-vous au dépôt Calavi.',
+    lastMessageTimestamp: new Date(Date.now() - 50 * 60000).toISOString(),
+    unreadCountForBuyer: 0,
+    unreadCountForSeller: 0,
+    status: 'active',
+    createdAt: new Date(Date.now() - 24 * 3600000).toISOString(),
+  },
+];
+
+const DEFAULT_CONVERSATION_MESSAGES: Record<string, DirectConversationMessage[]> = {
+  conv_mkt_001: [
+    {
+      id: 'cmsg_01',
+      conversationId: 'conv_mkt_001',
+      senderId: 'usr_driver_01',
+      senderName: 'Utilisateur Demo',
+      senderRole: 'driver',
+      senderAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+      content: 'Bonjour ! Votre support téléphone étanche avec chargeur est-il toujours disponible à Cotonou ?',
+      timestamp: new Date(Date.now() - 70 * 60000).toISOString(),
+    },
+    {
+      id: 'cmsg_02',
+      conversationId: 'conv_mkt_001',
+      senderId: 'usr_driver_01',
+      senderName: 'Utilisateur Demo',
+      senderRole: 'driver',
+      senderAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+      content: 'Je vous propose 6 000 FCFA pour un achat direct aujourd\'hui.',
+      offerAmount: 6000,
+      offerStatus: 'pending',
+      timestamp: new Date(Date.now() - 65 * 60000).toISOString(),
+    },
+    {
+      id: 'cmsg_03',
+      conversationId: 'conv_mkt_001',
+      senderId: 'usr_02',
+      senderName: 'Paul A.',
+      senderRole: 'client',
+      senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+      content: 'Oui le support est disponible, je peux vous le livrer cet après-midi au carrefour Vedoko.',
+      timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
+    },
+  ],
+  conv_rnt_002: [
+    {
+      id: 'cmsg_10',
+      conversationId: 'conv_rnt_002',
+      senderId: 'usr_driver_01',
+      senderName: 'Utilisateur Demo',
+      senderRole: 'driver',
+      senderAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+      content: 'Bonjour M. Saliou, le tricycle cargo Dayang 200cc est-il libre pour une location de 2 jours à Calavi ?',
+      rentalDaysRequested: 2,
+      offerAmount: 14000,
+      timestamp: new Date(Date.now() - 120 * 60000).toISOString(),
+    },
+    {
+      id: 'cmsg_11',
+      conversationId: 'conv_rnt_002',
+      senderId: 'usr_owner_02',
+      senderName: 'M. Saliou B. (Flotte Calavi)',
+      senderAvatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80',
+      content: 'Demande de location pour 2 jours acceptée. Rendez-vous au dépôt Calavi.',
+      timestamp: new Date(Date.now() - 50 * 60000).toISOString(),
+    },
+  ],
+};
+
+const DEFAULT_CUSTOM_GROUPS: CustomChatGroup[] = [
+  {
+    id: 'grp_team_akpakpa',
+    name: 'Chauffeurs Akpakpa & Dantokpa Express',
+    description: 'Coordination des livraisons rapides du marché Dantokpa vers Akpakpa, PLM, Avotrou et Sèmè-Kpodji.',
+    iconEmoji: '⚡',
+    avatarUrl: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=300&auto=format&fit=crop&q=80',
+    city: 'Cotonou',
+    country: 'Bénin',
+    category: 'drivers_team',
+    creatorId: 'usr_02',
+    creatorName: 'Paul A. (Express)',
+    creatorPhone: '+229 97 45 67 89',
+    memberCount: 28,
+    memberIds: ['usr_02', 'usr_driver_01', 'usr_03', 'usr_04'],
+    createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
+    pinnedNotice: '📢 Relais colis prioritaire aux heures de pointe (12h-15h) au carrefour Le Bélier.',
+  },
+  {
+    id: 'grp_tricycles_benin',
+    name: 'Club Tricycles Cargo & Grosses Bennes',
+    description: 'Entraide, location et partage de missions gros volumes, sacs de vivres et déménagements sur Cotonou et Calavi.',
+    iconEmoji: '🚚',
+    avatarUrl: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=300&auto=format&fit=crop&q=80',
+    city: 'Abomey-Calavi',
+    country: 'Bénin',
+    category: 'logistics',
+    creatorId: 'usr_05',
+    creatorName: 'Fabrice Dossou',
+    creatorPhone: '+229 96 55 44 33',
+    memberCount: 19,
+    memberIds: ['usr_05', 'usr_driver_01'],
+    createdAt: new Date(Date.now() - 10 * 86400000).toISOString(),
+    pinnedNotice: '📦 Tarifs minimums concertés : 4000 FCFA pour tout trajet cargo supérieur à 300kg.',
+  },
+  {
+    id: 'grp_calavi_relais',
+    name: 'Livreurs Zogbadjè & Campus UAC',
+    description: 'Groupe d\'entraide des livreurs opérant autour de l\'université d\'Abomey-Calavi et des cités étudiantes.',
+    iconEmoji: '🎓',
+    avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80',
+    city: 'Abomey-Calavi',
+    country: 'Bénin',
+    category: 'neighborhood',
+    creatorId: 'usr_10',
+    creatorName: 'Bio Saliou',
+    creatorPhone: '+229 95 66 77 88',
+    memberCount: 34,
+    memberIds: ['usr_10', 'usr_driver_01'],
+    createdAt: new Date(Date.now() - 12 * 86400000).toISOString(),
+    pinnedNotice: '💡 Attention aux ralentisseurs et chantiers de pavage vers Tankpè et Parana.',
+  },
+  {
+    id: 'grp_porto_express',
+    name: 'Réseau Ouando - Tokpota Porto-Novo',
+    description: 'Liaisons express entre la capitale Porto-Novo, Adjarra, Dangbo et transferts vers Cotonou.',
+    iconEmoji: '🏍️',
+    avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80',
+    city: 'Porto-Novo',
+    country: 'Bénin',
+    category: 'drivers_team',
+    creatorId: 'usr_06',
+    creatorName: 'Alain Houénou',
+    creatorPhone: '+229 95 10 20 30',
+    memberCount: 22,
+    memberIds: ['usr_06'],
+    createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
   },
 ];
 
@@ -918,10 +1251,29 @@ class StorageService {
       if (data) {
         const all: ChatMessage[] = JSON.parse(data);
         if (Array.isArray(all) && all.length > 0) {
-          if (groupId) {
-            return all.filter((m) => m.groupId === groupId);
+          const avatarLookup: Record<string, string> = {
+            admin_sys: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=128&q=80',
+            usr_02: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=128&q=80',
+            usr_03: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=128&q=80',
+            usr_driver_01: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=128&q=80',
+            usr_04: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=128&q=80',
+            usr_05: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=128&q=80',
+            usr_06: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=128&q=80',
+          };
+          const currentUser = this.getUser();
+          if (currentUser?.avatarUrl) {
+            avatarLookup[currentUser.id] = currentUser.avatarUrl;
           }
-          return all;
+          const enriched = all.map((m) => {
+            if (!m.senderAvatar && avatarLookup[m.senderId]) {
+              return { ...m, senderAvatar: avatarLookup[m.senderId] };
+            }
+            return m;
+          });
+          if (groupId) {
+            return enriched.filter((m) => m.groupId === groupId);
+          }
+          return enriched;
         }
       }
     } catch {}
@@ -1011,6 +1363,228 @@ class StorageService {
     const list = this.getRentals();
     list.unshift(rental);
     this.saveRentals(list);
+  }
+
+  public deleteMarketplaceItem(id: string): void {
+    const list = this.getMarketplace().filter((item) => item.id !== id);
+    this.saveMarketplace(list);
+  }
+
+  public deleteRentalItem(id: string): void {
+    const list = this.getRentals().filter((item) => item.id !== id);
+    this.saveRentals(list);
+  }
+
+  public getConversations(userId?: string): DirectConversation[] {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.CONVERSATIONS);
+      let list: DirectConversation[] = data ? JSON.parse(data) : [];
+      if (!Array.isArray(list) || list.length === 0) {
+        list = DEFAULT_CONVERSATIONS;
+        this.saveConversations(list);
+      }
+      if (userId) {
+        return list.filter((c) => c.buyerOrRenterId === userId || c.sellerOrOwnerId === userId);
+      }
+      return list;
+    } catch {
+      return DEFAULT_CONVERSATIONS;
+    }
+  }
+
+  public saveConversations(conversations: DirectConversation[]): void {
+    localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+  }
+
+  public getConversationById(id: string): DirectConversation | undefined {
+    const all = this.getConversations();
+    return all.find((c) => c.id === id);
+  }
+
+  public getOrCreateConversation(
+    item: MarketplaceItem | RentalItem,
+    targetType: 'marketplace' | 'rental',
+    currentUser: UserProfile
+  ): DirectConversation {
+    const all = this.getConversations();
+    const sellerOrOwnerId = targetType === 'marketplace' ? (item as MarketplaceItem).sellerId : ((item as RentalItem).ownerId || 'usr_owner');
+    const existing = all.find(
+      (c) => c.itemId === item.id && c.buyerOrRenterId === currentUser.id
+    );
+
+    if (existing) return existing;
+
+    const sellerOrOwnerName = targetType === 'marketplace' ? (item as MarketplaceItem).sellerName : (item as RentalItem).ownerName;
+    const sellerOrOwnerPhone = targetType === 'marketplace' ? (item as MarketplaceItem).sellerPhone : (item as RentalItem).ownerPhone;
+    const sellerOrOwnerAvatar = targetType === 'marketplace' ? (item as MarketplaceItem).sellerAvatar : (item as RentalItem).ownerAvatar;
+    const price = targetType === 'marketplace' ? (item as MarketplaceItem).price : (item as RentalItem).dailyPrice;
+    const secondary = targetType === 'marketplace' ? `${(item as MarketplaceItem).sellerCity} • ${(item as MarketplaceItem).condition === 'new' ? 'Neuf' : 'Occasion'}` : `${(item as RentalItem).city} • Location`;
+
+    const newConv: DirectConversation = {
+      id: `conv_${targetType}_${item.id}_${currentUser.id}_${Date.now()}`,
+      targetType,
+      itemId: item.id,
+      itemTitle: item.title,
+      itemPrice: price,
+      itemPriceType: targetType === 'rental' ? 'per_day' : 'fixed',
+      itemImageUrl: item.imageUrl || (item.images && item.images[0]) || '',
+      itemSecondaryInfo: secondary,
+      sellerOrOwnerId,
+      sellerOrOwnerName,
+      sellerOrOwnerPhone,
+      sellerOrOwnerAvatar,
+      buyerOrRenterId: currentUser.id,
+      buyerOrRenterName: currentUser.name || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'Client',
+      buyerOrRenterPhone: currentUser.phone || '',
+      buyerOrRenterAvatar: currentUser.avatarUrl,
+      lastMessageText: `Discussion initiée à propos de "${item.title}"`,
+      lastMessageTimestamp: new Date().toISOString(),
+      unreadCountForBuyer: 0,
+      unreadCountForSeller: 1,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+
+    all.unshift(newConv);
+    this.saveConversations(all);
+
+    // Initial greeting message
+    const initialMsg: DirectConversationMessage = {
+      id: `cmsg_${Date.now()}`,
+      conversationId: newConv.id,
+      senderId: currentUser.id,
+      senderName: newConv.buyerOrRenterName,
+      senderRole: currentUser.role,
+      senderAvatar: currentUser.avatarUrl,
+      content: targetType === 'marketplace'
+        ? `Bonjour ${sellerOrOwnerName}, votre article "${item.title}" est-il toujours disponible ?`
+        : `Bonjour ${sellerOrOwnerName}, je suis intéressé par la location de votre engin "${item.title}". Est-il disponible ?`,
+      timestamp: new Date().toISOString(),
+    };
+
+    this.addConversationMessage(newConv.id, initialMsg);
+    return newConv;
+  }
+
+  public getAllConversationMessagesMap(): Record<string, DirectConversationMessage[]> {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.CONVERSATION_MESSAGES);
+      if (data) return JSON.parse(data);
+    } catch {}
+    return DEFAULT_CONVERSATION_MESSAGES;
+  }
+
+  public getConversationMessages(conversationId: string): DirectConversationMessage[] {
+    const map = this.getAllConversationMessagesMap();
+    return map[conversationId] || [];
+  }
+
+  public saveConversationMessages(conversationId: string, messages: DirectConversationMessage[]): void {
+    const map = this.getAllConversationMessagesMap();
+    map[conversationId] = messages;
+    localStorage.setItem(STORAGE_KEYS.CONVERSATION_MESSAGES, JSON.stringify(map));
+  }
+
+  public addConversationMessage(conversationId: string, message: DirectConversationMessage): void {
+    const msgs = this.getConversationMessages(conversationId);
+    msgs.push(message);
+    this.saveConversationMessages(conversationId, msgs);
+
+    // Update conversation metadata
+    const all = this.getConversations();
+    const idx = all.findIndex((c) => c.id === conversationId);
+    if (idx >= 0) {
+      all[idx].lastMessageText = message.content || (message.imageUrl ? '📷 Photo partagée' : message.isVoiceNote ? '🎙️ Message vocal' : 'Nouveau message');
+      all[idx].lastMessageTimestamp = message.timestamp;
+      this.saveConversations(all);
+    }
+  }
+
+  public updateConversationOfferStatus(
+    conversationId: string,
+    messageId: string,
+    status: 'accepted' | 'declined'
+  ): void {
+    const msgs = this.getConversationMessages(conversationId);
+    const target = msgs.find((m) => m.id === messageId);
+    if (target) {
+      target.offerStatus = status;
+      this.saveConversationMessages(conversationId, msgs);
+    }
+  }
+
+  public markConversationAsRead(conversationId: string, userId: string): void {
+    const all = this.getConversations();
+    const conv = all.find((c) => c.id === conversationId);
+    if (conv) {
+      if (conv.buyerOrRenterId === userId) {
+        conv.unreadCountForBuyer = 0;
+      } else if (conv.sellerOrOwnerId === userId) {
+        conv.unreadCountForSeller = 0;
+      }
+      this.saveConversations(all);
+    }
+  }
+
+  public getCustomGroups(): CustomChatGroup[] {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.CUSTOM_GROUPS);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    this.saveCustomGroups(DEFAULT_CUSTOM_GROUPS);
+    return DEFAULT_CUSTOM_GROUPS;
+  }
+
+  public saveCustomGroups(groups: CustomChatGroup[]): void {
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_GROUPS, JSON.stringify(groups));
+  }
+
+  public addCustomGroup(group: CustomChatGroup): void {
+    const groups = this.getCustomGroups();
+    groups.unshift(group);
+    this.saveCustomGroups(groups);
+  }
+
+  public updateCustomGroup(updated: CustomChatGroup): void {
+    const groups = this.getCustomGroups().map((g) => (g.id === updated.id ? updated : g));
+    this.saveCustomGroups(groups);
+  }
+
+  public deleteCustomGroup(id: string): void {
+    const groups = this.getCustomGroups().filter((g) => g.id !== id);
+    this.saveCustomGroups(groups);
+  }
+
+  public joinOrLeaveCustomGroup(groupId: string, userId: string): { isMember: boolean; group: CustomChatGroup } {
+    const groups = this.getCustomGroups();
+    const target = groups.find((g) => g.id === groupId);
+    if (!target) throw new Error('Groupe introuvable');
+
+    const memberIds = target.memberIds || [];
+    const isAlreadyMember = memberIds.includes(userId);
+
+    let updatedMembers: string[];
+    let newCount = target.memberCount;
+
+    if (isAlreadyMember) {
+      updatedMembers = memberIds.filter((id) => id !== userId);
+      newCount = Math.max(1, newCount - 1);
+    } else {
+      updatedMembers = [...memberIds, userId];
+      newCount += 1;
+    }
+
+    const updatedGroup: CustomChatGroup = {
+      ...target,
+      memberIds: updatedMembers,
+      memberCount: newCount,
+    };
+
+    this.updateCustomGroup(updatedGroup);
+    return { isMember: !isAlreadyMember, group: updatedGroup };
   }
 
   public getAidRequests(): AidRequest[] {

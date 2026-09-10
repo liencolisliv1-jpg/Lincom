@@ -21,6 +21,7 @@ import {
   Trash2,
   CheckCheck,
   Send,
+  Bike,
 } from 'lucide-react';
 
 interface NotificationCenterModalProps {
@@ -397,14 +398,17 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
 
               <div className="p-4 rounded-2xl bg-slate-800/70 border border-slate-700 space-y-3">
                 <h4 className="text-xs font-black text-emerald-400 uppercase tracking-wider">
-                  Son & Retour Haptique
+                  Son, Klaxon Moto & Retour Haptique
                 </h4>
 
                 <div className="space-y-3 text-xs">
                   <label className="flex items-center justify-between gap-3 cursor-pointer">
                     <div className="flex items-center gap-2">
                       <Volume2 className="w-4 h-4 text-emerald-400" />
-                      <span className="font-bold text-white">Carillon Sonore à l'arrivée d'une alerte</span>
+                      <div>
+                        <span className="font-bold text-white block">Carillon Sonore standard</span>
+                        <span className="text-[11px] text-slate-400">Pour les notifications courantes</span>
+                      </div>
                     </div>
                     <input
                       type="checkbox"
@@ -414,10 +418,42 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                     />
                   </label>
 
+                  <label className="flex items-center justify-between gap-3 cursor-pointer p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <div className="flex items-center gap-2">
+                      <Bike className="w-4 h-4 text-amber-400 shrink-0" />
+                      <div>
+                        <span className="font-bold text-amber-300 block">Signal Sonore Moto en Circulation</span>
+                        <span className="text-[11px] text-slate-300">Klaxon / sirène percutante anti-bruit pour livreurs à moto</span>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.driverCirculationSound !== false}
+                      onChange={() => handleToggleSetting('driverCirculationSound')}
+                      className="w-5 h-5 rounded accent-amber-400 cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-3 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="w-4 h-4 text-cyan-400" />
+                      <div>
+                        <span className="font-bold text-white block">Annonce Vocale Automatique</span>
+                        <span className="text-[11px] text-slate-400">Énonciation vocale claire ("Attention conducteur, course disponible")</span>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.driverVoiceAnnounce !== false}
+                      onChange={() => handleToggleSetting('driverVoiceAnnounce')}
+                      className="w-5 h-5 rounded accent-cyan-400 cursor-pointer"
+                    />
+                  </label>
+
                   <label className="flex items-center justify-between gap-3 cursor-pointer">
                     <div className="flex items-center gap-2">
                       <Vibrate className="w-4 h-4 text-amber-400" />
-                      <span className="font-bold text-white">Vibration sur smartphone (Navigator Vibrate)</span>
+                      <span className="font-bold text-white">Vibrations Vigoureuses dans la poche</span>
                     </div>
                     <input
                       type="checkbox"
@@ -426,6 +462,27 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                       className="w-5 h-5 rounded accent-emerald-400 cursor-pointer"
                     />
                   </label>
+
+                  {/* Bouton de test acoustique immédiat */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        notificationService.playDriverCirculationAlert('Test alerte sonore Liencolis : Le klaxon et la voix fonctionnent parfaitement !');
+                        setTestNotificationFeedback('🔊 Signal moto & annonce vocale joués !');
+                        setTimeout(() => setTestNotificationFeedback(null), 3000);
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+                    >
+                      <Volume2 className="w-4 h-4 text-slate-950" />
+                      <span>Tester le Klaxon Sonore Conducteur (Alerte Moto)</span>
+                    </button>
+                    {testNotificationFeedback && (
+                      <p className="text-[11px] text-center text-amber-300 font-bold mt-1.5 animate-in fade-in">
+                        {testNotificationFeedback}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

@@ -95,6 +95,7 @@ export const ClassifiedAdsBoard: React.FC<ClassifiedAdsBoardProps> = ({
       authorId: currentUser?.id || 'usr_anon',
       authorName: currentUser?.name || 'Utilisateur Liencolis',
       authorRole: currentUser?.role || 'client',
+      authorAvatarUrl: currentUser?.avatarUrl,
       phone: newPhone || currentUser?.phone || '+229 01 69 81 46 31',
       whatsapp: (newPhone || currentUser?.phone || '+2290169814632').replace(/[^\d]/g, ''),
       createdAt: new Date(now).toISOString(),
@@ -317,9 +318,18 @@ export const ClassifiedAdsBoard: React.FC<ClassifiedAdsBoardProps> = ({
 
               {/* Author & Action buttons */}
               <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                <div className="text-[11px] text-slate-400">
-                  <p className="font-bold text-slate-200 truncate max-w-[120px]">{ad.authorName}</p>
-                  <p className="text-[10px] capitalize text-slate-500">{ad.authorRole}</p>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-amber-400 shrink-0 shadow">
+                    {ad.authorAvatarUrl ? (
+                      <img src={ad.authorAvatarUrl} alt={ad.authorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span>{ad.authorName.slice(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-slate-400 min-w-0">
+                    <p className="font-bold text-slate-200 truncate max-w-[120px]">{ad.authorName}</p>
+                    <p className="text-[10px] capitalize text-slate-500">{ad.authorRole}</p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">

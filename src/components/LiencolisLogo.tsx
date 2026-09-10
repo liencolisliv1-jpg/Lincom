@@ -59,8 +59,8 @@ export const LiencolisLogo: React.FC<LiencolisLogoProps> = ({
             </span>
           </div>
           {showSubtitle && (
-            <span className={`text-slate-500 dark:text-slate-300 font-semibold tracking-wide mt-0.5 ${currentSize.sub}`}>
-              driver & community
+            <span className={`text-emerald-500 dark:text-amber-300 font-bold tracking-normal mt-0.5 ${currentSize.sub}`}>
+              Votre colis, notre lien.
             </span>
           )}
         </div>

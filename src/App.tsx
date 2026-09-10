@@ -28,7 +28,6 @@ import { ClassifiedAdsBoard } from './components/ClassifiedAdsBoard';
 import { MarketplaceAndRentals } from './components/MarketplaceAndRentals';
 import { MutualAidFund } from './components/MutualAidFund';
 import { AdminSupportDashboard } from './components/AdminSupportDashboard';
-import { AdminBackoffice } from './components/AdminBackoffice';
 import { AuthModal } from './components/AuthModal';
 import { PaymentModal } from './components/PaymentModal';
 import { UserProfileModal } from './components/UserProfileModal';
@@ -171,7 +170,6 @@ export default function App() {
   const [offlineModalOpen, setOfflineModalOpen] = useState<boolean>(false);
   const [permissionsModalOpen, setPermissionsModalOpen] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [showAdminBackoffice, setShowAdminBackoffice] = useState<boolean>(false);
 
   const openPaymentWithPurpose = (purpose?: PaymentPurpose | string) => {
     if (!requireAuth()) return;
@@ -204,6 +202,80 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Real-Time Cloud Firestore Multi-Sector Synchronization
+  useEffect(() => {
+    // 1. Synchronisation Courses & GPS
+    const unsubDeliveries = firestoreService.subscribeDeliveries((cloudDeliveries) => {
+      if (cloudDeliveries && cloudDeliveries.length > 0) {
+        setDeliveries((prev) => {
+          const map = new Map<string, Delivery>();
+          prev.forEach((d) => map.set(d.id, d));
+          cloudDeliveries.forEach((d) => map.set(d.id, d));
+          const merged = Array.from(map.values());
+          storageService.saveDeliveries(merged);
+          return merged;
+        });
+      }
+    });
+
+    // 2. Synchronisation Messages & Salon d'Entraide
+    const unsubMessages = firestoreService.subscribeMessages((cloudMessages) => {
+      if (cloudMessages && cloudMessages.length > 0) {
+        setMessages(cloudMessages);
+        storageService.saveMessages(cloudMessages);
+      }
+    });
+
+    // 3. Synchronisation Petites Annonces
+    const unsubAds = firestoreService.subscribeAds((cloudAds) => {
+      if (cloudAds && cloudAds.length > 0) {
+        setAds(cloudAds);
+        storageService.saveAds(cloudAds);
+      }
+    });
+
+    // 4. Synchronisation Marketplace / Vente matériel
+    const unsubMarketplace = firestoreService.subscribeMarketplace((cloudMarketplace) => {
+      if (cloudMarketplace && cloudMarketplace.length > 0) {
+        setMarketplace(cloudMarketplace);
+        storageService.saveMarketplace(cloudMarketplace);
+      }
+    });
+
+    // 5. Synchronisation Location d'Engins & Motos
+    const unsubRentals = firestoreService.subscribeRentals((cloudRentals) => {
+      if (cloudRentals && cloudRentals.length > 0) {
+        setRentals(cloudRentals);
+        storageService.saveRentals(cloudRentals);
+      }
+    });
+
+    // 6. Synchronisation Caisse de Solidarité / Tontine
+    const unsubAid = firestoreService.subscribeAidRequests((cloudAid) => {
+      if (cloudAid && cloudAid.length > 0) {
+        setAidRequests(cloudAid);
+        storageService.saveAidRequests(cloudAid);
+      }
+    });
+
+    // 7. Synchronisation Notifications Push en direct
+    const unsubNotifs = firestoreService.subscribeNotifications((cloudNotifs) => {
+      if (cloudNotifs && cloudNotifs.length > 0) {
+        setUpdates(cloudNotifs);
+      }
+    });
+
+    return () => {
+      unsubDeliveries();
+      unsubMessages();
+      unsubAds();
+      unsubMarketplace();
+      unsubRentals();
+      unsubAid();
+      unsubNotifs();
+    };
+  }, []);
+
   // Check VIP badge expiration reminder periodically
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'driver' || !currentUser.premiumBadgeUntil) return;
@@ -226,18 +298,6 @@ export default function App() {
       storageService.setUser(currentUser);
     }
   }, [currentUser]);
-
-  // Admin Backoffice Keyboard Shortcut (Ctrl+Shift+A)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.code === 'KeyA') {
-        e.preventDefault();
-        setShowAdminBackoffice(!showAdminBackoffice);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAdminBackoffice]);
 
   // Handlers for data mutations (with offline queueing & Firestore Cloud sync)
   const handleUpdateDelivery = (delivery: Delivery) => {
@@ -273,6 +333,7 @@ export default function App() {
 
   const handleSendMessage = (message: ChatMessage) => {
     storageService.addMessage(message);
+    firestoreService.saveMessage(message);
     if (!offlineSyncService.isEffectiveOnline()) {
       offlineSyncService.queueAction(
         'chat_message_sent',
@@ -298,16 +359,19 @@ export default function App() {
 
   const handleDeleteAd = (id: string) => {
     storageService.deleteAd(id);
+    firestoreService.deleteClassifiedAd(id);
     setAds(storageService.getAds());
   };
 
   const handleAddMarketplaceItem = (item: MarketplaceItem) => {
     storageService.addMarketplaceItem(item);
+    firestoreService.saveMarketplaceItem(item);
     setMarketplace(storageService.getMarketplace());
   };
 
   const handleAddRentalItem = (rental: RentalItem) => {
     storageService.addRentalItem(rental);
+    firestoreService.saveRentalItem(rental);
     setRentals(storageService.getRentals());
   };
 
@@ -396,16 +460,7 @@ export default function App() {
         />
       )}
 
-      {/* Admin Backoffice View */}
-      {!activeTrackingCode && showAdminBackoffice && (
-        <AdminBackoffice
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          isDarkMode={isDarkMode}
-        />
-      )}
-
-      {!activeTrackingCode && !showAdminBackoffice && (
+      {!activeTrackingCode && (
         <>
       {/* Top Main Navigation Bar */}
       <Navbar
@@ -572,7 +627,20 @@ export default function App() {
             currentUser={currentUser}
             onSendMessage={handleSendMessage}
             onOpenPayment={(purpose?: PaymentPurpose) => openPaymentWithPurpose(purpose || 'premium_badge_week')}
+            onOpenProfile={() => setProfileModalOpen(true)}
+            onOpenAuth={() => {
+              setAuthMode('login');
+              setAuthModalOpen(true);
+            }}
+            onUpdateUser={(updated) => {
+              storageService.setUser(updated);
+              setCurrentUser(updated);
+            }}
             isDarkMode={isDarkMode}
+            marketplaceItems={marketplace}
+            rentalItems={rentals}
+            onAddMarketplaceItem={handleAddMarketplaceItem}
+            onAddRentalItem={handleAddRentalItem}
           />
         )}
 
@@ -595,6 +663,10 @@ export default function App() {
             onAddMarketplaceItem={handleAddMarketplaceItem}
             onAddRentalItem={handleAddRentalItem}
             isDarkMode={isDarkMode}
+            onOpenAuth={() => {
+              setAuthMode('login');
+              setAuthModalOpen(true);
+            }}
           />
         )}
 
@@ -619,20 +691,23 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 border-t border-slate-800 text-slate-400 py-10 px-4 sm:px-6 lg:px-8 text-xs">
+      {/* Footer styled as per official Poster */}
+      <footer className="bg-[#081426] border-t border-slate-800 text-slate-400 py-10 px-4 sm:px-6 lg:px-8 text-xs">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Col 1: Brand */}
           <div className="space-y-3 md:col-span-2">
             <LiencolisLogo size="md" showSubtitle={true} />
+            <p className="text-amber-300 font-bold text-xs">
+              « La liberté au guidon, la confiance dans chaque colis. »
+            </p>
             <p className="text-slate-300 max-w-md leading-relaxed text-xs">
-              <strong>LIENCOLIS Driver Community</strong> est la plateforme communautaire et de sécurité routière conçue pour les livreurs béninois, particuliers, e-commerçants et restaurants.
+              <strong>LIENCOLIS</strong> est la plateforme intelligente conçue pour protéger nos conducteurs et sécuriser chaque livraison de colis au Bénin (77 communes).
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
               <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                🇧🇯 Fait au Bénin
+                📍 Bénin 🇧🇯
               </span>
-              <span className="text-slate-400">Équipe : <strong>Support Liencolis</strong></span>
+              <span className="text-slate-400">Site officiel : <strong className="text-white font-mono">lincom-1ecc6.web.app</strong></span>
             </div>
           </div>
 
@@ -702,12 +777,6 @@ export default function App() {
                 className="text-emerald-400 hover:underline font-semibold"
               >
                 Consulter la Charte de Sécurité ➔
-              </button>
-              <button
-                onClick={() => setShowAdminBackoffice(true)}
-                className="block text-amber-400 hover:underline font-semibold mt-2"
-              >
-                Espace administration
               </button>
             </div>
           </div>

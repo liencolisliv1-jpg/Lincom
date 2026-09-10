@@ -154,6 +154,57 @@ class VoiceService {
   }
 
   /**
+   * Plays realistic CB Radio / Walkie-Talkie Push-To-Talk initiation tone
+   */
+  public playRadioPttStart(): void {
+    try {
+      this.triggerProximityVibration('general');
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(850, now);
+      osc.frequency.setValueAtTime(1200, now + 0.05);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.13);
+    } catch {}
+  }
+
+  /**
+   * Plays authentic CB Radio Roger Beep on release of talk button
+   */
+  public playRadioPttEnd(): void {
+    try {
+      this.triggerProximityVibration('general');
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(2470, now); // classic 2470Hz roger beep
+
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.19);
+    } catch {}
+  }
+
+  /**
    * Speaks a clear French/international voice synthesis message
    */
   public speak(text: string, lang = 'fr-FR', onEnd?: () => void): void {

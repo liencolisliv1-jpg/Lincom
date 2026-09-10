@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LiencolisLogo } from './LiencolisLogo';
 
-// Direct ESM imports for local assets so Vite processes them properly in dev and production
+// Direct ESM imports for local assets
 import heroDriverImg from '../assets/images/hero_driver_benin_1788086400357.jpg';
 import communityCourierImg from '../assets/images/community_courier_benin_1788441002237.jpg';
 import driversSolidarityImg from '../assets/images/drivers_solidarity_benin_1788441020195.jpg';
@@ -13,9 +13,7 @@ import {
   MapPin,
   Smartphone,
   Users,
-  Sparkles,
   ArrowRight,
-  PhoneCall,
   Volume2,
   Navigation,
   CheckCircle2,
@@ -28,8 +26,6 @@ import {
   Pause,
   Maximize2,
   HeartHandshake,
-  Store,
-  Bike,
   Truck,
   X,
   Eye,
@@ -79,6 +75,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   currentUser,
 }) => {
   const [heroTrackingCode, setHeroTrackingCode] = useState('');
+
   // Slides data showing couriers, community ties, shopkeepers and solidarity
   const slides: HeroSlide[] = [
     {
@@ -176,12 +173,12 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   };
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-slate-900 via-blue-950/85 to-slate-900 border-b border-slate-800 text-white py-8 px-4 sm:px-6 lg:px-8">
-      {/* Background Atmosphere Elements */}
-      <div className="absolute inset-0 pointer-events-none opacity-20">
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-500 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }}></div>
+    <div className="relative overflow-hidden bg-[#0A192F] border-b border-slate-800 text-white py-8 px-4 sm:px-6 lg:px-8">
+      {/* Background Atmosphere Glows (Palette Affiche : Bleu nuit, Émeraude & Or) */}
+      <div className="absolute inset-0 pointer-events-none opacity-25">
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-amber-500 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }}></div>
         <div className="absolute top-1/2 -right-24 w-96 h-96 bg-emerald-500 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '10s' }}></div>
-        <div className="absolute -bottom-24 left-1/3 w-96 h-96 bg-amber-500 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s' }}></div>
+        <div className="absolute -bottom-24 left-1/3 w-96 h-96 bg-blue-600 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s' }}></div>
       </div>
 
       <div className="max-w-7xl mx-auto relative z-10">
@@ -192,7 +189,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold tracking-wide">
                 <Shield className="w-4 h-4 text-emerald-400" />
-                <span>liencolis (driver and communauty) 🇧🇯 • lincom-1ecc6.web.app</span>
+                <span>LIENCOLIS BÉNIN 🇧🇯 • lincom-1ecc6.web.app</span>
               </div>
 
               {!currentUser && (
@@ -203,16 +200,16 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                     className="px-3.5 py-1.5 rounded-xl bg-slate-800/95 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
                     id="hero-top-login-btn"
                   >
-                    <LogIn className="w-3.5 h-3.5 text-sky-400" />
+                    <LogIn className="w-3.5 h-3.5 text-amber-400" />
                     <span>Connexion</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onOpenAuth('register')}
-                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/25 transition-all active:scale-95"
+                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/25 transition-all active:scale-95"
                     id="hero-top-register-btn"
                   >
-                    <UserPlus className="w-3.5 h-3.5 text-amber-300" />
+                    <UserPlus className="w-3.5 h-3.5 text-slate-950" />
                     <span>Inscription</span>
                   </button>
                 </div>
@@ -224,11 +221,10 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             </h1>
 
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl">
-              Fini les risques d'accidents en consultant son téléphone : <strong>liencolis (driver and communauty)</strong> crée le <strong>lien direct et solidaire entre commerçants, clients et livreurs</strong> avec un GPS sonore mains-libres, des alertes automatiques à 300m et une caisse de secours fraternelle.
+              Fini les risques d'accidents en consultant son téléphone : <strong>Liencolis</strong> crée le <strong>lien direct et solidaire entre commerçants, clients et livreurs</strong> avec un GPS sonore mains-libres, des alertes automatiques à 300m et une caisse de secours fraternelle.
             </p>
 
             {/* 4 Pillars Grid: Community and App Features */}
-            {/* Value Highlights Feature Grid */}
             <div className="grid grid-cols-2 gap-3 pt-1">
               <button
                 type="button"
@@ -236,7 +232,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 className={`text-left p-3.5 rounded-2xl border transition-all duration-300 flex flex-col justify-between aspect-[1/0.85] [transform-style:preserve-3d] hover:[transform:rotateX(6deg)_rotateY(-6deg)_translateZ(10px)] ${
                   currentSlideIndex === 0
                     ? 'bg-amber-950/60 border-amber-400 shadow-xl shadow-amber-500/20 ring-2 ring-amber-400/50 backdrop-blur-md'
-                    : 'bg-slate-850/80 border-slate-750 hover:border-slate-600 backdrop-blur-sm'
+                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 backdrop-blur-sm'
                 }`}
               >
                 <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shadow-lg border border-amber-500/30">
@@ -254,7 +250,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 className={`text-left p-3.5 rounded-2xl border transition-all duration-300 flex flex-col justify-between aspect-[1/0.85] [transform-style:preserve-3d] hover:[transform:rotateX(6deg)_rotateY(6deg)_translateZ(10px)] ${
                   currentSlideIndex === 1
                     ? 'bg-emerald-950/60 border-emerald-400 shadow-xl shadow-emerald-500/20 ring-2 ring-emerald-400/50 backdrop-blur-md'
-                    : 'bg-slate-850/80 border-slate-750 hover:border-slate-600 backdrop-blur-sm'
+                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 backdrop-blur-sm'
                 }`}
               >
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-lg border border-emerald-500/30">
@@ -272,7 +268,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 className={`text-left p-3.5 rounded-2xl border transition-all duration-300 flex flex-col justify-between aspect-[1/0.85] [transform-style:preserve-3d] hover:[transform:rotateX(-6deg)_rotateY(-6deg)_translateZ(10px)] ${
                   currentSlideIndex === 2
                     ? 'bg-blue-950/60 border-blue-400 shadow-xl shadow-blue-500/20 ring-2 ring-blue-400/50 backdrop-blur-md'
-                    : 'bg-slate-850/80 border-slate-750 hover:border-slate-600 backdrop-blur-sm'
+                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 backdrop-blur-sm'
                 }`}
               >
                 <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shadow-lg border border-blue-500/30">
@@ -290,7 +286,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 className={`text-left p-3.5 rounded-2xl border transition-all duration-300 flex flex-col justify-between aspect-[1/0.85] [transform-style:preserve-3d] hover:[transform:rotateX(-6deg)_rotateY(6deg)_translateZ(10px)] ${
                   currentSlideIndex === 3
                     ? 'bg-purple-950/60 border-purple-400 shadow-xl shadow-purple-500/20 ring-2 ring-purple-400/50 backdrop-blur-md'
-                    : 'bg-slate-850/80 border-slate-750 hover:border-slate-600 backdrop-blur-sm'
+                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 backdrop-blur-sm'
                 }`}
               >
                 <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shadow-lg border border-purple-500/30">
@@ -307,18 +303,18 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <button
                 onClick={onOpenNewDelivery}
-                className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black px-5 py-3 rounded-2xl text-sm shadow-xl shadow-amber-500/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+                className="bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black px-5 py-3 rounded-2xl text-sm shadow-xl shadow-amber-500/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
                 id="hero-launch-delivery-btn"
               >
-                <Navigation className="w-4 h-4" />
+                <Navigation className="w-4 h-4 text-slate-950" />
                 <span>Lancer une Livraison GPS</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 text-slate-950" />
               </button>
 
               {onInstallApp && (
                 <button
                   onClick={onInstallApp}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black px-4 py-3 rounded-2xl text-sm shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-emerald-400/40"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-3 rounded-2xl text-sm shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-emerald-400/40"
                   id="hero-install-app-btn"
                 >
                   <Smartphone className="w-4 h-4 text-emerald-200" />
@@ -331,7 +327,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-3 rounded-2xl text-sm border border-slate-700 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
                 id="hero-join-community-btn"
               >
-                <Users className="w-4 h-4 text-emerald-400" />
+                <Users className="w-4 h-4 text-amber-400" />
                 <span>Rejoindre la Communauté</span>
               </button>
 
@@ -340,7 +336,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 className="inline-flex items-center gap-1.5 text-xs text-amber-300 hover:text-amber-200 font-semibold underline underline-offset-4 px-2 py-1"
               >
                 <Gift className="w-4 h-4" />
-                <span>Offre 150 premiers : -10% + 10j offerts</span>
+                <span>Offre spéciale : -10% + 10j offerts</span>
               </button>
             </div>
 
@@ -368,7 +364,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                   value={heroTrackingCode}
                   onChange={(e) => setHeroTrackingCode(e.target.value)}
                   placeholder="Collez votre code de suivi (ex: LC-2026-9042)..."
-                  className="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                   id="hero-tracking-input"
                 />
                 <button
@@ -394,7 +390,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                   <button
                     type="button"
                     onClick={() => onNavigateToTab('deliveries')}
-                    className="p-3 rounded-2xl text-center flex flex-col items-center justify-center gap-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 border border-amber-500/30 text-amber-300 transition-all duration-300 hover:scale-105 active:scale-95 shadow-md backdrop-blur-md"
+                    className="p-3 rounded-2xl text-center flex flex-col items-center justify-center gap-1.5 bg-amber-500/10 hover:bg-amber-400 hover:text-slate-950 border border-amber-500/30 text-amber-300 transition-all duration-300 hover:scale-105 active:scale-95 shadow-md backdrop-blur-md"
                   >
                     <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
                       <Navigation className="w-4 h-4 text-amber-400" />
@@ -513,7 +509,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
-                    <span className="text-[11px] font-black text-white">LIENCOLIS BÉNIN</span>
+                    <span className="text-[11px] font-black text-white">LIENCOLIS BÉNIN 🇧🇯</span>
                   </div>
 
                   <div className="flex items-center gap-1.5 bg-emerald-500/90 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-black text-slate-950 shadow-lg">
@@ -727,7 +723,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                     setZoomModalOpen(false);
                     onOpenNewDelivery();
                   }}
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5"
+                  className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5"
                 >
                   <Navigation className="w-3.5 h-3.5" />
                   <span>Tester cette fonction</span>
@@ -740,4 +736,3 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
     </div>
   );
 };
-

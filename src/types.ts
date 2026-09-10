@@ -144,6 +144,17 @@ export interface Delivery {
   deliveredAt?: string;
 }
 
+export interface LiveLocationData {
+  latitude: number;
+  longitude: number;
+  address?: string;
+  landmark?: string;
+  isLive?: boolean;
+  durationMinutes?: number;
+  expiresAt?: string;
+  accuracyMeters?: number;
+}
+
 export interface ChatMessage {
   id: string;
   groupId: string; // 'global' or city name e.g. 'cotonou'
@@ -157,6 +168,8 @@ export interface ChatMessage {
   content: string;
   audioUrl?: string;
   audioDurationSeconds?: number;
+  isWalkieTalkie?: boolean;
+  location?: LiveLocationData;
   mediaUrl?: string;
   mediaType?: 'image' | 'video';
   stickerId?: string;
@@ -166,6 +179,29 @@ export interface ChatMessage {
   timestamp: string;
   translatedText?: Record<string, string>; // langCode -> translation
   reactions?: Record<string, number>;
+}
+
+export type CustomGroupCategory = 'drivers_team' | 'neighborhood' | 'logistics' | 'commercial' | 'social';
+
+export interface CustomChatGroup {
+  id: string;
+  name: string;
+  description: string;
+  iconEmoji?: string;
+  avatarUrl?: string;
+  country?: string;
+  city?: string;
+  category: CustomGroupCategory;
+  creatorId: string;
+  creatorName: string;
+  creatorPhone?: string;
+  creatorAvatar?: string;
+  isPrivate?: boolean;
+  passcode?: string;
+  memberCount: number;
+  memberIds?: string[];
+  createdAt: string;
+  pinnedNotice?: string;
 }
 
 export type AdCategory = 
@@ -188,6 +224,7 @@ export interface ClassifiedAd {
   authorId: string;
   authorName: string;
   authorRole: UserRole;
+  authorAvatarUrl?: string;
   phone: string;
   whatsapp: string;
   createdAt: string;
@@ -264,16 +301,26 @@ export interface MarketplaceItem {
   condition: 'new' | 'used';
   category: 'helmet' | 'gps_mount' | 'delivery_bag' | 'jacket' | 'spare_parts' | 'other';
   imageUrl: string;
-  images?: string[]; // Multiple photos under different angles
+  images?: string[]; // Multiple photos under different angles (up to 5 photos)
   sellerId: string;
   sellerName: string;
   sellerPhone: string;
   sellerCity: string;
   sellerCountry?: string;
   sellerCountryCode?: string;
+  sellerAvatar?: string;
   currency?: string;
   isSold: boolean;
   createdAt: string;
+}
+
+export interface RentalItemSpecs {
+  payloadCapacityKg?: number; // e.g. 800 kg for cargo tricycle
+  fuelType?: 'essence' | 'diesel' | 'electrique';
+  mileageKm?: number;
+  hasHelmetIncluded?: boolean;
+  hasInsurance?: boolean;
+  hasLockIncluded?: boolean;
 }
 
 export interface RentalItem {
@@ -287,12 +334,60 @@ export interface RentalItem {
   countryCode?: string;
   currency?: string;
   imageUrl: string;
-  images?: string[]; // Multiple photos under different angles
+  images?: string[]; // Multiple photos under different angles (up to 5 photos)
+  ownerId?: string;
   ownerName: string;
   ownerPhone: string;
   ownerWhatsapp: string;
+  ownerAvatar?: string;
   isAvailable: boolean;
   description: string;
+  specs?: RentalItemSpecs;
+  depositAmount?: number; // Caution en FCFA
+  createdAt?: string;
+}
+
+export interface DirectConversationMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole?: UserRole;
+  senderAvatar?: string;
+  content: string;
+  imageUrl?: string;
+  audioUrl?: string;
+  audioDurationSeconds?: number;
+  isVoiceNote?: boolean;
+  offerAmount?: number;
+  rentalDaysRequested?: number;
+  offerStatus?: 'pending' | 'accepted' | 'declined';
+  timestamp: string;
+}
+
+export interface DirectConversation {
+  id: string;
+  targetType: 'marketplace' | 'rental';
+  itemId: string;
+  itemTitle: string;
+  itemPrice: number;
+  itemPriceType?: 'fixed' | 'per_day';
+  itemImageUrl: string;
+  itemSecondaryInfo?: string;
+  sellerOrOwnerId: string;
+  sellerOrOwnerName: string;
+  sellerOrOwnerPhone: string;
+  sellerOrOwnerAvatar?: string;
+  buyerOrRenterId: string;
+  buyerOrRenterName: string;
+  buyerOrRenterPhone: string;
+  buyerOrRenterAvatar?: string;
+  lastMessageText: string;
+  lastMessageTimestamp: string;
+  unreadCountForBuyer: number;
+  unreadCountForSeller: number;
+  status: 'active' | 'archived' | 'deal_closed';
+  createdAt: string;
 }
 
 export type PaymentPurpose = 
@@ -386,6 +481,8 @@ export interface NotificationSettings {
   aidFundAlerts: boolean;
   soundEnabled: boolean;
   vibrationEnabled: boolean;
+  driverCirculationSound: boolean; // Signal sonore percutant spécial circulation moto
+  driverVoiceAnnounce: boolean; // Synthèse vocale de la course ou alerte
 }
 
 export type OfflineActionType =

@@ -1,6 +1,7 @@
 import { QueuedOfflineAction, OfflineActionType, OfflineSyncState } from '../types';
 import { storageService } from './storageService';
 import { notificationService } from './notificationService';
+import { firestoreService } from './firestoreService';
 
 const STORAGE_KEYS = {
   OFFLINE_QUEUE: 'liencolis_offline_actions_queue',
@@ -126,7 +127,7 @@ class OfflineSyncService {
   }
 
   private executeActionDirectly(action: QueuedOfflineAction) {
-    // Action is processed into the corresponding local database
+    // Action is processed into the corresponding local database and Firestore cloud
     switch (action.type) {
       case 'delivery_status_update':
         if (action.payload?.deliveryId && action.payload?.status) {
@@ -138,22 +139,34 @@ class OfflineSyncService {
               target.deliveredAt = new Date().toISOString();
             }
             storageService.updateDelivery(target);
+            if (this.isEffectiveOnline()) {
+              firestoreService.saveDelivery(target);
+            }
           }
         }
         break;
       case 'new_classified_ad':
         if (action.payload) {
           storageService.addAd(action.payload);
+          if (this.isEffectiveOnline()) {
+            firestoreService.saveClassifiedAd(action.payload);
+          }
         }
         break;
       case 'chat_message_sent':
         if (action.payload) {
           storageService.addMessage(action.payload);
+          if (this.isEffectiveOnline()) {
+            firestoreService.saveMessage(action.payload);
+          }
         }
         break;
       case 'aid_request_created':
         if (action.payload) {
           storageService.addAidRequest(action.payload);
+          if (this.isEffectiveOnline()) {
+            firestoreService.saveAidRequest(action.payload);
+          }
         }
         break;
       default:

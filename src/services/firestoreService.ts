@@ -24,6 +24,9 @@ import {
   RentalItem,
   MarketplaceItem,
   AppNotification,
+  DirectConversation,
+  DirectConversationMessage,
+  CustomChatGroup,
 } from '../types';
 
 export const firestoreService = {
@@ -200,6 +203,114 @@ export const firestoreService = {
       await setDoc(itemRef, item, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `marketplace/${item.id}`);
+    }
+  },
+
+  // Delete Marketplace Item
+  async deleteMarketplaceItem(itemId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'marketplace', itemId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `marketplace/${itemId}`);
+    }
+  },
+
+  // Delete Rental Item
+  async deleteRentalItem(rentalId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'rentals', rentalId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `rentals/${rentalId}`);
+    }
+  },
+
+  // Direct In-App Conversations Listener
+  subscribeConversations(callback: (convs: DirectConversation[]) => void): () => void {
+    try {
+      const q = query(collection(db, 'conversations'), limit(60));
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: DirectConversation[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push(docSnap.data() as DirectConversation);
+            });
+            list.sort((a, b) => new Date(b.lastMessageTimestamp).getTime() - new Date(a.lastMessageTimestamp).getTime());
+            callback(list);
+          }
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'conversations');
+        }
+      );
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'conversations');
+      return () => {};
+    }
+  },
+
+  // Save Direct Conversation
+  async saveConversation(conv: DirectConversation): Promise<void> {
+    try {
+      const convRef = doc(db, 'conversations', conv.id);
+      await setDoc(convRef, conv, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `conversations/${conv.id}`);
+    }
+  },
+
+  // Save Conversation Message
+  async saveConversationMessage(message: DirectConversationMessage): Promise<void> {
+    try {
+      const msgRef = doc(db, `conversations/${message.conversationId}/messages`, message.id);
+      await setDoc(msgRef, message, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `conversations/${message.conversationId}/messages/${message.id}`);
+    }
+  },
+
+  // Real-time listener for Custom Driver Groups
+  subscribeCustomGroups(callback: (groups: CustomChatGroup[]) => void): () => void {
+    try {
+      const q = query(collection(db, 'customGroups'), limit(60));
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: CustomChatGroup[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push(docSnap.data() as CustomChatGroup);
+            });
+            callback(list);
+          }
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'customGroups');
+        }
+      );
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'customGroups');
+      return () => {};
+    }
+  },
+
+  // Save Custom Group
+  async saveCustomGroup(group: CustomChatGroup): Promise<void> {
+    try {
+      const grpRef = doc(db, 'customGroups', group.id);
+      await setDoc(grpRef, group, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `customGroups/${group.id}`);
+    }
+  },
+
+  // Delete Custom Group
+  async deleteCustomGroup(groupId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'customGroups', groupId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `customGroups/${groupId}`);
     }
   },
 

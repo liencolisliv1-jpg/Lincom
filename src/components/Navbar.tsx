@@ -184,17 +184,17 @@ export const Navbar: React.FC<NavbarProps> = ({
       id="liencolis-header-navbar"
       className="sticky top-0 z-40 w-full backdrop-blur-md transition-colors duration-200 border-b bg-slate-900/95 border-slate-800 text-slate-100"
     >
-      {/* Top Banner for Trial & International Network */}
-      <div className="bg-gradient-to-r from-emerald-600 via-blue-700 to-amber-600 text-white text-xs py-1.5 px-3 font-semibold text-center flex items-center justify-center gap-2 overflow-x-auto shadow-inner">
-        <Sparkles className="w-4 h-4 text-amber-300 animate-spin shrink-0" style={{ animationDuration: '4s' }} />
+      {/* Top Banner with Official Poster Slogan */}
+      <div className="bg-gradient-to-r from-emerald-600 via-[#0a1e38] to-amber-600 text-white text-xs py-1.5 px-3 font-semibold text-center flex items-center justify-center gap-2 overflow-x-auto shadow-inner">
+        <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
         <span className="truncate">
-          🌍 <strong className="text-amber-200">Réseau International Liencolis :</strong> Disponible au Bénin, dans toute l'Afrique & partout dans le monde • 10 jours d'essai GRATUIT !
+          🇧🇯 <strong className="text-amber-300">LIENCOLIS BÉNIN :</strong> « La liberté au guidon, la confiance dans chaque colis » • <span className="font-mono text-emerald-300">lincom-1ecc6.web.app</span>
         </span>
         <button
           onClick={() => onOpenPayment?.()}
-          className="ml-2 bg-amber-400 text-slate-950 px-2 py-0.5 rounded text-[11px] font-bold hover:bg-amber-300 transition-colors shrink-0"
+          className="ml-2 bg-amber-400 text-slate-950 px-2 py-0.5 rounded text-[11px] font-black hover:bg-amber-300 transition-colors shrink-0"
         >
-          Voir Offres
+          Offre Spéciale
         </button>
       </div>
 
@@ -452,8 +452,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center gap-2 p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 transition-all text-left"
                 >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-emerald-500 flex items-center justify-center font-bold text-xs text-white shadow">
-                    {currentUser.firstName ? currentUser.firstName[0] : 'G'}
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-emerald-500 flex items-center justify-center font-bold text-xs text-white shadow overflow-hidden shrink-0">
+                    {currentUser.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      currentUser.firstName ? currentUser.firstName[0] : (currentUser.name ? currentUser.name[0] : 'U')
+                    )}
                   </div>
                   <div className="hidden sm:flex flex-col pr-1">
                     <span className="text-xs font-bold text-slate-100 flex items-center gap-1">
@@ -472,18 +476,27 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-56 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95">
-                    <div className="px-4 py-2 border-b border-slate-800">
-                      <p className="text-xs font-bold text-slate-100">{currentUser.name}</p>
-                      <p className="text-[11px] text-slate-400 truncate">{currentUser.email}</p>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          {currentUser.role.toUpperCase()}
-                        </span>
-                        {currentUser.hasFirstMonthDiscount && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            -10% Actif
-                          </span>
+                    <div className="px-4 py-2.5 border-b border-slate-800 flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow">
+                        {currentUser.avatarUrl ? (
+                          <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          currentUser.name?.[0] || 'U'
                         )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-100 truncate">{currentUser.name}</p>
+                        <p className="text-[11px] text-slate-400 truncate">{currentUser.email}</p>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            {currentUser.role.toUpperCase()}
+                          </span>
+                          {currentUser.hasFirstMonthDiscount && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              -10% Actif
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 

@@ -3,7 +3,7 @@ import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Delivery } from '../types';
 import { resolveCoordinates } from './GoogleMapView';
-import { MapPin, Navigation, Compass, Layers, Phone } from 'lucide-react';
+import { MapPin, Navigation, Compass, Layers, Phone, Eye, Satellite } from 'lucide-react';
 
 interface MapLibreViewProps {
   deliveries: Delivery[];
@@ -12,6 +12,52 @@ interface MapLibreViewProps {
   userCoords?: { lat: number; lng: number } | null;
   className?: string;
 }
+
+type MapTileStyle = 'osm' | 'osmfr' | 'satellite' | 'esri_streets';
+
+const TILE_SOURCES: Record<
+  MapTileStyle,
+  { label: string; icon: string; tiles: string[]; attribution: string; maxzoom: number }
+> = {
+  osm: {
+    label: 'OpenStreetMap (Rues & Quartiers)',
+    icon: '🗺️',
+    tiles: [
+      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    ],
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributeurs',
+    maxzoom: 19,
+  },
+  osmfr: {
+    label: 'OSM France / Afrique (Haute Définition)',
+    icon: '📍',
+    tiles: [
+      'https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+      'https://b.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+      'https://c.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+    ],
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> & OSM France',
+    maxzoom: 20,
+  },
+  satellite: {
+    label: 'Satellite HD Réel (Esri Aerial)',
+    icon: '🛰️',
+    tiles: [
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    ],
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP',
+    maxzoom: 18,
+  },
+  esri_streets: {
+    label: 'Plan Routier Urbain (Esri Streets)',
+    icon: '🚗',
+    tiles: [
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    ],
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, METI, TomTom',
+    maxzoom: 19,
+  },
+};
 
 export const MapLibreView: React.FC<MapLibreViewProps> = ({
   deliveries = [],
@@ -25,6 +71,8 @@ export const MapLibreView: React.FC<MapLibreViewProps> = ({
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
+  const [activeTileStyle, setActiveTileStyle] = useState<MapTileStyle>('osm');
+  const [showLayerMenu, setShowLayerMenu] = useState(false);
 
   const safeDeliveries = Array.isArray(deliveries) ? deliveries : [];
   const selectedDelivery = safeDeliveries.find((d) => d.id === selectedDeliveryId) || safeDeliveries[0] || null;
@@ -43,31 +91,28 @@ export const MapLibreView: React.FC<MapLibreViewProps> = ({
         ]
       : [2.4183, 6.3703]; // Cotonou centre [lng, lat]
 
-    // High performance raster style with CartoDB Voyager (Full CORS support, zero API key requirement, fast CDN)
+    // 100% Free OpenStreetMap raster style (Zero API key required, crisp global tiles with full Benin coverage)
+    const initialConfig = TILE_SOURCES[activeTileStyle];
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: {
         version: 8,
         sources: {
-          'carto-tiles': {
+          'free-raster-tiles': {
             type: 'raster',
-            tiles: [
-              'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-              'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-              'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-              'https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-            ],
+            tiles: initialConfig.tiles,
             tileSize: 256,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            attribution: initialConfig.attribution,
+            maxzoom: initialConfig.maxzoom,
           },
         },
         layers: [
           {
-            id: 'carto-tiles-layer',
+            id: 'free-raster-layer',
             type: 'raster',
-            source: 'carto-tiles',
+            source: 'free-raster-tiles',
             minzoom: 0,
-            maxzoom: 19,
+            maxzoom: initialConfig.maxzoom,
           },
         ],
       },
@@ -101,6 +146,53 @@ export const MapLibreView: React.FC<MapLibreViewProps> = ({
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // Switch Tile Style Layer dynamically
+  const changeTileStyle = (newStyle: MapTileStyle) => {
+    setActiveTileStyle(newStyle);
+    setShowLayerMenu(false);
+    const map = mapInstanceRef.current;
+    if (!map || !mapLoaded) return;
+
+    const config = TILE_SOURCES[newStyle];
+    const source = map.getSource('free-raster-tiles') as any;
+
+    if (source && source.setTiles) {
+      source.setTiles(config.tiles);
+    } else {
+      // If setTiles is not available, safely recreate the source and layer
+      try {
+        if (map.getLayer('free-raster-layer')) {
+          map.removeLayer('free-raster-layer');
+        }
+        if (map.getSource('free-raster-tiles')) {
+          map.removeSource('free-raster-tiles');
+        }
+        map.addSource('free-raster-tiles', {
+          type: 'raster',
+          tiles: config.tiles,
+          tileSize: 256,
+          attribution: config.attribution,
+          maxzoom: config.maxzoom,
+        });
+
+        // Insert layer at the bottom behind route lines
+        const beforeLayer = map.getLayer('route-line-casing') ? 'route-line-casing' : undefined;
+        map.addLayer(
+          {
+            id: 'free-raster-layer',
+            type: 'raster',
+            source: 'free-raster-tiles',
+            minzoom: 0,
+            maxzoom: config.maxzoom,
+          },
+          beforeLayer
+        );
+      } catch (err) {
+        console.warn('Error updating map tile source:', err);
+      }
+    }
+  };
 
   // Update Markers & Routes when state changes
   useEffect(() => {
@@ -291,11 +383,56 @@ export const MapLibreView: React.FC<MapLibreViewProps> = ({
 
   return (
     <div className={`relative rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 ${className}`}>
-      {/* Top Badge: MapLibre GL WebGL */}
-      <div className="absolute top-3 left-3 z-[10] flex items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-white shadow-lg pointer-events-none">
-        <MapPin className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-        <span className="font-black text-emerald-300">MapLibre GL Bénin</span>
-        <span className="text-slate-400 text-[10px] hidden sm:inline">Rendu WebGL Rapide & Gratuit</span>
+      {/* Top Controls: Map Title & Layer Switcher */}
+      <div className="absolute top-3 left-3 z-[10] flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-xs text-white shadow-lg pointer-events-none">
+          <MapPin className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+          <span className="font-black text-emerald-300">OpenStreetMap Bénin</span>
+          <span className="text-slate-400 text-[10px] hidden sm:inline">&bull; 100% Gratuit &amp; Sans Clé API</span>
+        </div>
+
+        {/* Style selector button & dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowLayerMenu(!showLayerMenu)}
+            className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-md transition"
+            title="Changer le style de carte (Rues, Satellite, Afrique)"
+          >
+            <Layers className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px]">{TILE_SOURCES[activeTileStyle].icon} {activeTileStyle === 'satellite' ? 'Satellite HD' : activeTileStyle === 'osmfr' ? 'OSM Afrique' : activeTileStyle === 'esri_streets' ? 'Plan Urbain' : 'Rues OSM'}</span>
+          </button>
+
+          {showLayerMenu && (
+            <div className="absolute top-full left-0 mt-1.5 w-60 bg-slate-900/95 border border-slate-700 rounded-xl shadow-2xl p-1.5 space-y-1 z-30 backdrop-blur-md animate-in fade-in">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+                Fonds de carte gratuits
+              </div>
+              {(Object.keys(TILE_SOURCES) as MapTileStyle[]).map((key) => {
+                const item = TILE_SOURCES[key];
+                const isActive = activeTileStyle === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => changeTileStyle(key)}
+                    className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition ${
+                      isActive
+                        ? 'bg-emerald-600/90 text-white font-bold'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </span>
+                    {isActive && <span className="text-[10px] bg-emerald-800 px-1.5 py-0.5 rounded text-white">Actif</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Quick Action Controls (3D Mode & GPS Center) */}

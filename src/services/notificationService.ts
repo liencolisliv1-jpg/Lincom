@@ -16,6 +16,8 @@ const DEFAULT_SETTINGS: NotificationSettings = {
   aidFundAlerts: true,
   soundEnabled: true,
   vibrationEnabled: true,
+  driverCirculationSound: true,
+  driverVoiceAnnounce: true,
 };
 
 const DEFAULT_NOTIFICATIONS: AppNotification[] = [
@@ -288,6 +290,131 @@ class NotificationService {
     }
   }
 
+  /**
+   * Signal sonore percutant et distinctif pour conducteurs en circulation (moto / tricycle)
+   * Génère 3 impulsions acoustiques riches en harmoniques (triangle/sawtooth 950Hz -> 1800Hz)
+   * conçues pour traverser le bruit du trafic et du vent, accompagnées de vibrations puissantes
+   * et d'une annonce vocale dynamique en français ("Attention conducteur, nouvelle course disponible !").
+   */
+  public playDriverCirculationAlert(voiceAnnouncement: string = 'Attention conducteur, nouvelle course disponible !'): void {
+    const settings = this.getSettings();
+    if (!settings.soundEnabled && !settings.driverCirculationSound) return;
+
+    try {
+      if (typeof window === 'undefined') return;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx || typeof AudioCtx !== 'function') return;
+
+      if (!this.audioContext) {
+        try {
+          this.audioContext = new AudioCtx();
+        } catch {
+          return;
+        }
+      }
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(() => {});
+      }
+
+      if (!this.audioContext) return;
+      const ctx = this.audioContext;
+      const now = ctx.currentTime;
+
+      // Fonction d'impulsion sonore aiguë et percutante (klaxon / sirène de dispatching Liencolis)
+      const triggerPulse = (startTime: number, startFreq: number, endFreq: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        // Onde triangle pour des harmoniques franches et audibles sous le casque
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(startFreq, startTime);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, startTime + duration * 0.7);
+
+        gain.gain.setValueAtTime(0.01, startTime);
+        gain.gain.linearRampToValueAtTime(0.45, startTime + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      // Impulsion 1 : 950 Hz -> 1400 Hz (0.15s)
+      triggerPulse(now, 950, 1400, 0.15);
+      // Impulsion 2 : 1250 Hz -> 1750 Hz (0.16s)
+      triggerPulse(now + 0.18, 1250, 1750, 0.16);
+      // Impulsion 3 : Cloche de fin 1900 Hz (0.22s)
+      triggerPulse(now + 0.38, 1450, 1900, 0.22);
+    } catch (e) {
+      console.warn('Circulation audio alert warning:', e);
+    }
+
+    // Vibrations vigoureuses spécifiques pour moto dans la poche [vibre, pause, vibre, pause, vibre long]
+    if (settings.vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate([250, 100, 250, 100, 450]);
+      } catch {}
+    }
+
+    // Annonce vocale de guidage après le signal sonore
+    if (settings.driverVoiceAnnounce !== false && voiceAnnouncement) {
+      setTimeout(() => {
+        this.speak(voiceAnnouncement);
+      }, 650);
+    }
+  }
+
+  /**
+   * Alerte sonore pour message urgent de la communauté ou dispatch
+   */
+  public playDriverUrgentMessageAlert(senderName?: string): void {
+    const settings = this.getSettings();
+    if (!settings.soundEnabled && !settings.driverCirculationSound) return;
+
+    try {
+      if (typeof window === 'undefined') return;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        if (!this.audioContext) this.audioContext = new AudioCtx();
+        if (this.audioContext.state === 'suspended') this.audioContext.resume().catch(() => {});
+        const ctx = this.audioContext;
+        const now = ctx.currentTime;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1046.5, now); // C6
+        osc.frequency.setValueAtTime(1318.5, now + 0.1); // E6
+        osc.frequency.setValueAtTime(1567.98, now + 0.2); // G6
+
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      }
+    } catch {}
+
+    if (settings.vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate([150, 80, 250]);
+      } catch {}
+    }
+
+    if (settings.driverVoiceAnnounce !== false) {
+      setTimeout(() => {
+        const text = senderName
+          ? `Nouveau message de ${senderName} dans la communauté.`
+          : 'Alerte : Nouveau message urgent dans la communauté.';
+        this.speak(text);
+      }, 500);
+    }
+  }
+
   private showNativeNotification(fullNotification: AppNotification): void {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     try {
@@ -418,6 +545,7 @@ class NotificationService {
    * Dispatches an alert for urgent order (anonymized, no customer private details)
    */
   public notifyUrgentDelivery(title: string, city: string, priceFcfa: number): void {
+    this.playDriverCirculationAlert(`Attention conducteur, course urgente disponible à ${city} pour ${priceFcfa} FCFA !`);
     this.sendPushNotification({
       type: 'urgent_delivery',
       title: `⚡ Course Urgente Disponible (${city})`,
