@@ -35,13 +35,9 @@ service cloud.firestore {
     // Deliveries: Real-time tracking and dispatching
     match /deliveries/{deliveryId} {
       allow read: if true;
-      allow create: if isAuthenticated() || (
+      allow create, update: if isAuthenticated() || isAdmin() || (
         request.resource.data.trackingCode is string &&
         request.resource.data.status is string
-      );
-      allow update: if isAuthenticated() || isAdmin() || (
-        // Permit status updates if correct security PIN or status transition
-        request.resource.data.status in ['assigned', 'picked_up', 'in_transit', 'approaching_300m', 'delivered', 'cancelled']
       );
       allow delete: if isAdmin();
     }
@@ -59,16 +55,14 @@ service cloud.firestore {
 
     // Driver Mutual Aid Requests (Caisse d'entraide)
     match /aidRequests/{requestId} {
-      allow read: if isAuthenticated() || isAdmin();
-      allow create: if isAuthenticated() && (
+      allow read: if true;
+      allow create: if isAuthenticated() || (
         request.resource.data.requestedAmount is number &&
-        request.resource.data.requestedAmount > 0 &&
-        request.resource.data.status == 'pending'
+        request.resource.data.requestedAmount > 0
       );
       allow update: if isAdmin() || (
         isAuthenticated() &&
-        resource.data.driverId == request.auth.uid &&
-        resource.data.status == 'pending'
+        (resource.data.driverId == request.auth.uid || resource.data.driverId == null)
       );
       allow delete: if isAdmin();
     }
@@ -121,6 +115,12 @@ service cloud.firestore {
       allow read: if true;
       allow create: if true; // Allow system and clients to emit real-time push alerts
       allow update, delete: if isAdmin();
+    }
+
+    // App Licenses & Activation Keys
+    match /licenses/{licenseId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     // Global Fallback: STRICT DENY for all undefined routes and internal paths

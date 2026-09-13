@@ -16,6 +16,7 @@ import { LiveLocationCard } from './LiveLocationCard';
 import { WalkieTalkieModal } from './WalkieTalkieModal';
 import { CreateCustomGroupModal } from './CreateCustomGroupModal';
 import { MarketplaceAndRentals } from './MarketplaceAndRentals';
+import { ImageLightboxModal } from './ImageLightboxModal';
 import { storageService } from '../services/storageService';
 import { firestoreService } from '../services/firestoreService';
 import { voiceService } from '../services/voiceService';
@@ -374,6 +375,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [showVipInfoModal, setShowVipInfoModal] = useState<boolean>(false);
   const [showCameraModal, setShowCameraModal] = useState<boolean>(false);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [inspectedDriver, setInspectedDriver] = useState<CommunityDriverProfile | null>(null);
   const [isUpdatingSelfAvatar, setIsUpdatingSelfAvatar] = useState<boolean>(false);
   const [messageReactions, setMessageReactions] = useState<Record<string, Record<string, number>>>({});
@@ -389,7 +391,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
     return false;
   });
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const recordIntervalRef = useRef<number | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -572,9 +574,11 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
     return cityDrivers.filter((d) => d.hasPremiumBadge);
   }, [cityDrivers]);
 
-  // Auto-scroll on new message
+  // Auto-scroll on new message without drifting the whole page
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   }, [groupMessages]);
 
   // Voice recording timer
@@ -1783,7 +1787,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
           )}
 
           {/* Messages Scroll Area */}
-          <div className="flex-1 p-4 space-y-4 overflow-y-auto max-h-[460px] bg-slate-950/40 scrollbar-thin">
+          <div ref={messagesContainerRef} className="flex-1 p-4 space-y-4 overflow-y-auto max-h-[460px] bg-slate-950/40 scrollbar-thin">
             {groupMessages.length === 0 ? (
               <div className="text-center py-16 space-y-2">
                 <MessageSquare className="w-10 h-10 text-slate-600 mx-auto" />
@@ -1955,8 +1959,12 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                           </div>
                         ) : msg.stickerId || msg.content.includes('[STICKER]') ? (
                           /* Graphical Driver Sticker Card */
-                          <div className="py-1 my-0.5">
-                            <div className={`rounded-2xl p-3 bg-gradient-to-br ${msg.stickerGradient || 'from-indigo-600 to-purple-700'} text-white border border-white/20 shadow-lg relative overflow-hidden group`}>
+                          <div className="py-1 my-0.5 space-y-1">
+                            <div className="flex items-center gap-1 text-[10px] font-black uppercase text-amber-400 tracking-wider">
+                              <Sparkles className="w-3 h-3" />
+                              <span>Sticker Conducteur</span>
+                            </div>
+                            <div className={`rounded-2xl p-3.5 bg-gradient-to-br ${msg.stickerGradient || 'from-indigo-600 to-purple-700'} text-white border border-white/25 shadow-lg relative overflow-hidden group`}>
                               <div className="flex items-center gap-3">
                                 <span className="text-3xl sm:text-4xl drop-shadow filter">{msg.stickerEmoji || '✨'}</span>
                                 <div>
@@ -1974,10 +1982,22 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                           <p className="leading-relaxed whitespace-pre-wrap text-[13px]">{msg.content}</p>
                         )}
 
-                        {/* Photo / Media Attachment */}
+                        {/* Photo / Media Attachment with clear label and zoom */}
                         {msg.mediaUrl && (
-                          <div className="mt-2.5 rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
-                            <img src={msg.mediaUrl} alt="Attachement" className="max-h-56 w-full object-cover object-center" referrerPolicy="no-referrer" />
+                          <div className="mt-2.5 space-y-1">
+                            <div className="flex items-center gap-1 text-[10px] font-black uppercase text-sky-400 tracking-wider">
+                              <Camera className="w-3 h-3" />
+                              <span>Photo Partagée</span>
+                            </div>
+                            <div className="rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shadow-md">
+                              <img
+                                src={msg.mediaUrl}
+                                alt="Photo partagée"
+                                className="max-h-64 w-full object-cover object-center cursor-pointer hover:scale-[1.02] transition-transform"
+                                referrerPolicy="no-referrer"
+                                onClick={() => setPreviewPhotoUrl(msg.mediaUrl || null)}
+                              />
+                            </div>
                           </div>
                         )}
 
@@ -2048,7 +2068,6 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                 );
               })
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Moderation Error Warning Box */}
@@ -2172,61 +2191,56 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                     }}
                   />
 
-                  {/* Media, Camera and Voice buttons (in City Groups) */}
+                  {/* Media, Camera, GPS and Voice buttons (in City Groups) - Distinct colorful badges */}
                   {!selectedGroup.isGlobal ? (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Talkie-Walkie CB Radio Modal Trigger */}
-                      <button
-                        type="button"
-                        onClick={() => setShowWalkieTalkieModal(true)}
-                        className="p-2.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 transition-colors shadow-sm cursor-pointer"
-                        title="Talkie-Walkie CB & Alertes Rapides Guidon"
-                        id="btn-walkie-talkie-chat"
-                      >
-                        <Radio className="w-4 h-4" />
-                      </button>
-
-                      {/* GPS Live Sharing Trigger */}
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
+                      {/* 1. GPS Live Sharing Button */}
                       <button
                         type="button"
                         onClick={() => setShowLiveLocationModal(true)}
-                        className="p-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-colors shadow-sm cursor-pointer"
-                        title="Partager ma position GPS en direct ou repère"
+                        className="px-2.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                        title="Partager ma position GPS en direct ou un repère"
                         id="btn-share-gps-chat"
                       >
-                        <Navigation className="w-4 h-4 fill-emerald-400 text-emerald-400" />
+                        <Navigation className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400" />
+                        <span className="hidden md:inline">Position</span>
+                        <span>GPS</span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setIsRecordingVoice(true)}
-                        className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 transition-colors"
-                        title="Enregistrer un message vocal"
-                        id="btn-voice-recorder"
-                      >
-                        <Mic className="w-4 h-4" />
-                      </button>
-
+                      {/* 2. Camera / Photo Capture Button */}
                       <button
                         type="button"
                         onClick={() => setShowCameraModal(true)}
-                        className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-colors"
-                        title="Prendre une photo avec l'appareil photo"
+                        className="px-2.5 py-2 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                        title="Prendre une photo ou ajouter une image de colis"
                         id="btn-camera-chat"
                       >
-                        <Camera className="w-4 h-4" />
+                        <Camera className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Photo</span>
                       </button>
 
+                      {/* 3. Voice Recording Button */}
                       <button
                         type="button"
-                        onClick={() => {
-                          const url = prompt('Collez l’URL d’une photo de matériel ou de colis :');
-                          if (url) setSelectedMediaUrl(url);
-                        }}
-                        className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 transition-colors hidden sm:inline-flex"
-                        title="Partager un lien d'image"
+                        onClick={() => setIsRecordingVoice(true)}
+                        className="px-2.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                        title="Enregistrer un message vocal"
+                        id="btn-voice-recorder"
                       >
-                        <Image className="w-4 h-4" />
+                        <Mic className="w-3.5 h-3.5 text-rose-400" />
+                        <span className="hidden sm:inline">Vocal</span>
+                      </button>
+
+                      {/* 4. Talkie-Walkie CB Radio Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowWalkieTalkieModal(true)}
+                        className="p-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                        title="Talkie-Walkie CB & Alertes Guidon"
+                        id="btn-walkie-talkie-chat"
+                      >
+                        <Radio className="w-3.5 h-3.5 text-purple-400" />
+                        <span className="hidden lg:inline">Radio</span>
                       </button>
                     </div>
                   ) : (
@@ -2622,6 +2636,15 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
         currentUser={currentUser}
         onGroupCreated={handleCustomGroupCreated}
         onOpenAuth={onOpenAuth}
+      />
+
+      {/* Image Lightbox Preview for Chat Photos */}
+      <ImageLightboxModal
+        isOpen={!!previewPhotoUrl}
+        onClose={() => setPreviewPhotoUrl(null)}
+        images={previewPhotoUrl ? [previewPhotoUrl] : []}
+        title="Photo Partagée"
+        subtitle="Discussion Liencolis"
       />
     </div>
   );

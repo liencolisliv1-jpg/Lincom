@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Delivery, DeliveryStatus, UserProfile, PaymentPurpose } from '../types';
 import { BENIN_CITY_NAMES } from '../constants/beninCities';
@@ -14,6 +14,9 @@ import { QuickDeliveryModal } from './QuickDeliveryModal';
 import { GoogleMapView } from './GoogleMapView';
 import { MapLibreView } from './MapLibreView';
 import { getPublicTrackingUrl } from '../utils/trackingUrl';
+import { OfficialDeliveryReceiptModal } from './OfficialDeliveryReceiptModal';
+import { FairPriceCalculatorModal } from './FairPriceCalculatorModal';
+import { ExpressParcelRadarModal } from './ExpressParcelRadarModal';
 import {
   Navigation,
   MapPin,
@@ -152,6 +155,12 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [showNewDeliveryModal, setShowNewDeliveryModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptDelivery, setReceiptDelivery] = useState<Delivery | null>(null);
+  const [showFairPriceModal, setShowFairPriceModal] = useState(false);
+  const [fairPricePickup, setFairPricePickup] = useState('Cadjehoun');
+  const [fairPriceDropoff, setFairPriceDropoff] = useState('Calavi Kpota');
+  const [showRadarModal, setShowRadarModal] = useState(false);
 
   useEffect(() => {
     if (triggerNewDeliveryModal && triggerNewDeliveryModal > 0) {
@@ -159,7 +168,16 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
     }
   }, [triggerNewDeliveryModal]);
 
-  const selectedDelivery = deliveries.find((d) => d.id === selectedDeliveryId) || deliveries[0];
+  const uniqueDeliveries = useMemo(() => {
+    const seen = new Set<string>();
+    return deliveries.filter((d) => {
+      if (!d || !d.id || seen.has(d.id)) return false;
+      seen.add(d.id);
+      return true;
+    });
+  }, [deliveries]);
+
+  const selectedDelivery = uniqueDeliveries.find((d) => d.id === selectedDeliveryId) || uniqueDeliveries[0];
 
   // Simulation step timer
   const simulationRef = useRef<number | null>(null);
@@ -525,6 +543,10 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
       origin: { y: 0.6 },
     });
 
+    // Automatically trigger official delivery receipt modal
+    setReceiptDelivery(updated);
+    setShowReceiptModal(true);
+
     const voiceMsg = commCalc.commissionAmount > 0
       ? `Félicitations ! Livraison confirmée avec succès par le client. Commission de ${commCalc.commissionAmount} Francs CFA prélevée, et votre accès au retrait est à nouveau disponible.`
       : "Félicitations ! Livraison confirmée avec succès par le client. Vos fonds et accès aux retraits sont à nouveau disponibles.";
@@ -577,6 +599,55 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
             <span>Tester Vibreur 300m</span>
           </button>
 
+
+          {/* Radar de Colis Express (Alerte Sonore 2-5km) */}
+          <button
+            type="button"
+            onClick={() => setShowRadarModal(true)}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white px-3.5 py-2 rounded-xl text-xs font-extrabold shadow-md transition-all hover:scale-[1.02] cursor-pointer"
+            id="open-radar-express-btn"
+            title="Radar de Colis Express en temps réel (détection sonar 2-5km et alerte sonore)"
+          >
+            <Radio className="w-4 h-4 text-emerald-200 animate-pulse" />
+            <span>Radar Express</span>
+            <span className="ml-1 px-1.5 py-0.5 rounded bg-emerald-950/80 text-[10px] font-mono border border-emerald-400/40 text-emerald-200">
+              Sonar
+            </span>
+          </button>
+
+          {/* Barème Prix Juste (Anti-Négociation Abusive) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedDelivery) {
+                setFairPricePickup(selectedDelivery.pickupAddress || selectedDelivery.pickupCity || 'Cadjehoun');
+                setFairPriceDropoff(selectedDelivery.dropoffAddress || selectedDelivery.dropoffCity || 'Calavi Kpota');
+              }
+              setShowFairPriceModal(true);
+            }}
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 px-3.5 py-2 rounded-xl text-xs font-extrabold shadow-md transition-all hover:scale-[1.02] cursor-pointer"
+            id="open-fair-price-btn"
+            title="Calculateur kilométrique de barème équitable (anti-négociation abusive)"
+          >
+            <Gauge className="w-4 h-4 text-amber-400" />
+            <span>Barème Prix Juste</span>
+          </button>
+
+          {/* Reçu Officiel Numérique */}
+          <button
+            type="button"
+            onClick={() => {
+              const target = selectedDelivery?.status === 'delivered' ? selectedDelivery : deliveries.find(d => d.status === 'delivered') || selectedDelivery;
+              setReceiptDelivery(target || null);
+              setShowReceiptModal(true);
+            }}
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 px-3.5 py-2 rounded-xl text-xs font-extrabold shadow-md transition-all hover:scale-[1.02] cursor-pointer"
+            id="open-official-receipt-btn"
+            title="Générer ou imprimer le reçu officiel de livraison"
+          >
+            <CheckCircle className="w-4 h-4 text-emerald-400" />
+            <span>Reçu Officiel</span>
+          </button>
 
           {/* Midnight Daily Digest Button (00h00) */}
           <button
@@ -684,13 +755,13 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
           title="Optimiser l'ordre de passage avec Google Maps API"
         >
           <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
-          <span>Calculer Ordre Optimal ({deliveries.length} arrêts)</span>
+          <span>Calculer Ordre Optimal ({uniqueDeliveries.length} arrêts)</span>
         </button>
 
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mx-1">
           Mes Courses :
         </span>
-        {deliveries.map((del) => {
+        {uniqueDeliveries.map((del) => {
           const isSelected = del.id === selectedDelivery?.id;
           const statusColors: Record<DeliveryStatus, string> = {
             pending: 'bg-slate-700 text-slate-200 border-slate-600',
@@ -1244,8 +1315,16 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
 
               {/* Client Direct Contact & In-App Call Screen Buttons */}
               <div className="p-3.5 rounded-xl bg-blue-950/40 border border-blue-800/50 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-200">Client : {selectedDelivery.clientPseudo}</span>
+                <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-200">Client : {selectedDelivery.clientPseudo}</span>
+                    {selectedDelivery.isPrivilegedSender && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        <span>{selectedDelivery.privilegedSenderBadge || '⭐ Abonné Privilégié (Prioritaire)'}</span>
+                      </span>
+                    )}
+                  </div>
                   <span className="font-mono text-slate-300">{selectedDelivery.clientPhone}</span>
                 </div>
 
@@ -1537,6 +1616,55 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
         onClose={() => setShowMidnightDigestModal(false)}
         currentUser={currentUser}
         deliveries={deliveries}
+      />
+
+      {/* Official Delivery Digital Receipt Modal (WhatsApp / PDF / QR Code) */}
+      <OfficialDeliveryReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        delivery={receiptDelivery || selectedDelivery}
+        currentUser={currentUser}
+      />
+
+      {/* Fair Price Calculator Modal (Anti-Négociation Abusive) */}
+      <FairPriceCalculatorModal
+        isOpen={showFairPriceModal}
+        onClose={() => setShowFairPriceModal(false)}
+        initialPickup={fairPricePickup}
+        initialDropoff={fairPriceDropoff}
+        initialVehicleType={currentUser?.vehicleType || 'moto_2wheels'}
+      />
+
+      {/* Express Parcel Radar Modal (Sonar Sonore & Détection Proximité 2-5km) */}
+      <ExpressParcelRadarModal
+        isOpen={showRadarModal}
+        onClose={() => setShowRadarModal(false)}
+        deliveries={deliveries}
+        ads={storageService.getAds()}
+        currentUser={currentUser}
+        onAcceptDelivery={(del) => {
+          const existing = deliveries.find((d) => d.id === del.id);
+          if (existing) {
+            const updated: Delivery = {
+              ...existing,
+              driverId: currentUser?.id || 'usr_driver_01',
+              driverName: currentUser?.name || 'Livreur Demo',
+              driverPhone: currentUser?.phone || '+229 00 00 00 00',
+              status: 'in_transit',
+            };
+            onUpdateDelivery(updated);
+          } else {
+            onAddDelivery(del);
+          }
+          setSelectedDeliveryId(del.id);
+          setShowRadarModal(false);
+        }}
+        onOpenPriceCalculator={(p, d) => {
+          setFairPricePickup(p);
+          setFairPriceDropoff(d);
+          setShowFairPriceModal(true);
+        }}
+        isDarkMode={isDarkMode}
       />
     </div>
   );

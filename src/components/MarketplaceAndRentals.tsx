@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   MarketplaceItem,
   RentalItem,
@@ -42,6 +42,11 @@ import {
   X,
   UserCheck,
   Star,
+  Share2,
+  CheckSquare,
+  Square,
+  Copy,
+  CheckCircle,
 } from 'lucide-react';
 
 interface MarketplaceAndRentalsProps {
@@ -50,6 +55,8 @@ interface MarketplaceAndRentalsProps {
   currentUser: UserProfile | null;
   onAddMarketplaceItem: (item: MarketplaceItem) => void;
   onAddRentalItem: (rental: RentalItem) => void;
+  onDeleteMarketplaceItem?: (id: string) => void;
+  onToggleMarketplaceItemSold?: (id: string) => void;
   isDarkMode: boolean;
   onOpenAuth?: () => void;
   onOpenPayment?: (purpose?: any) => void;
@@ -62,6 +69,8 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
   currentUser,
   onAddMarketplaceItem,
   onAddRentalItem,
+  onDeleteMarketplaceItem,
+  onToggleMarketplaceItemSold,
   isDarkMode,
   onOpenAuth,
   onOpenPayment,
@@ -79,6 +88,12 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
 
+  // Bulk Selection & Sharing State
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const [showMyItemsOnly, setShowMyItemsOnly] = useState<boolean>(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
+
   // Modal Visibility State
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -95,6 +110,88 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
 
   // Card Image Carousel Index State: { [itemId: string]: number }
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
+
+  const showToast = (msg: string) => {
+    setShareToast(msg);
+    setTimeout(() => setShareToast(null), 3500);
+  };
+
+  const toggleSelectItem = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllFilteredItems = (items: MarketplaceItem[]) => {
+    const allIds = new Set(items.map((i) => i.id));
+    setSelectedItemIds(allIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedItemIds(new Set());
+    setIsSelectionMode(false);
+  };
+
+  const handleShareSingleItem = (item: MarketplaceItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const appUrl = window.location.origin;
+    const text = `🛒 *ANNONCE LIENCOLIS* 🇧🇯\n\n📌 *${item.title}*\n💰 *Prix :* ${item.price.toLocaleString()} FCFA\n📍 *Ville :* ${item.sellerCity}\n👌 *État :* ${item.condition === 'new' ? 'Neuf' : 'Occasion'}\n📝 *Description :* ${item.description}\n\n👤 *Vendeur :* ${item.sellerName} (${item.sellerPhone})\n🔗 *Voir sur Liencolis :* ${appUrl}`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: item.title,
+        text: text,
+        url: appUrl,
+      }).catch(() => {
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      });
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+    showToast('Lien de partage prêt !');
+  };
+
+  const handleCopyItemText = (item: MarketplaceItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const appUrl = window.location.origin;
+    const text = `🛒 *ANNONCE LIENCOLIS*\n📌 *${item.title}*\n💰 Prix : ${item.price.toLocaleString()} FCFA\n📍 Ville : ${item.sellerCity}\n👤 Contact : ${item.sellerName} (${item.sellerPhone})\n🔗 ${appUrl}`;
+    navigator.clipboard.writeText(text);
+    showToast('Texte de l’annonce copié dans le presse-papier !');
+  };
+
+  const handleShareSelectedItems = (items: MarketplaceItem[]) => {
+    const selected = items.filter((i) => selectedItemIds.has(i.id));
+    if (selected.length === 0) {
+      alert('Veuillez sélectionner au moins un article à partager.');
+      return;
+    }
+    const appUrl = window.location.origin;
+    let catalog = `🛍️ *CATALOGUE D'ARTICLES LIENCOLIS (${selected.length} articles disponibles)* 🇧🇯\n\n`;
+    selected.forEach((item, idx) => {
+      catalog += `🔹 *${idx + 1}. ${item.title}*\n   💰 Prix : *${item.price.toLocaleString()} FCFA*\n   📍 Ville : ${item.sellerCity} | État : ${item.condition === 'new' ? 'Neuf' : 'Occasion'}\n   📞 Contact Vendeur : ${item.sellerName} (${item.sellerPhone})\n\n`;
+    });
+    catalog += `🚀 Retrouvez tous ces articles et discutez en direct sur Liencolis : ${appUrl}`;
+
+    if (navigator.share) {
+      navigator.share({
+        title: `Catalogue Liencolis (${selected.length} articles)`,
+        text: catalog,
+        url: appUrl,
+      }).catch(() => {
+        window.open(`https://wa.me/?text=${encodeURIComponent(catalog)}`, '_blank');
+      });
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(catalog)}`, '_blank');
+    }
+    showToast(`Catalogue de ${selected.length} articles prêt à être partagé !`);
+  };
 
   // New Market Item Form State
   const [mTitle, setMTitle] = useState('');
@@ -166,18 +263,20 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
     setIsChatModalOpen(true);
   };
 
-  const handleCreateMarketItem = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mTitle || !mPrice) return;
+  const executeSaveMarketItem = (keepOpen = false) => {
+    if (!mTitle.trim() || !mPrice) {
+      alert('Veuillez renseigner au moins le titre et le prix de vente.');
+      return;
+    }
 
     const finalImages = mImages.length > 0
       ? mImages
       : ['https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80'];
 
     const newItem: MarketplaceItem = {
-      id: `mkt_${Date.now()}`,
-      title: mTitle,
-      description: mDesc || 'Matériel de sécurité et livraison de qualité certifié.',
+      id: `mkt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title: mTitle.trim(),
+      description: mDesc.trim() || 'Matériel de sécurité et livraison de qualité certifié.',
       price: parseInt(mPrice),
       condition: mCondition,
       category: mCategory,
@@ -195,23 +294,31 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
     };
 
     onAddMarketplaceItem(newItem);
-    setShowAddModal(false);
+    showToast(`✅ "${newItem.title}" publié avec succès !`);
+
+    // Reset fields for the next potential item
     setMTitle('');
     setMDesc('');
     setMImages([]);
+
+    if (!keepOpen) {
+      setShowAddModal(false);
+    }
   };
 
-  const handleCreateRentalItem = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rTitle || !rDailyPrice) return;
+  const executeSaveRentalItem = (keepOpen = false) => {
+    if (!rTitle.trim() || !rDailyPrice) {
+      alert('Veuillez renseigner le modèle du véhicule et le prix journalier.');
+      return;
+    }
 
     const finalImages = rImages.length > 0
       ? rImages
       : ['https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600&auto=format&fit=crop&q=80'];
 
     const newRental: RentalItem = {
-      id: `rnt_${Date.now()}`,
-      title: rTitle,
+      id: `rnt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title: rTitle.trim(),
       vehicleType: rVehicleType,
       dailyPrice: parseInt(rDailyPrice),
       weeklyPrice: rWeeklyPrice ? parseInt(rWeeklyPrice) : undefined,
@@ -227,7 +334,7 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
       ownerWhatsapp: (currentUser?.phone || '+2290169814632').replace(/[^\d]/g, ''),
       ownerAvatar: currentUser?.avatarUrl,
       isAvailable: true,
-      description: rDesc || 'Engin en excellent état avec visite technique, assurance et entretien régulier.',
+      description: rDesc.trim() || 'Engin en excellent état avec visite technique, assurance et entretien régulier.',
       specs: {
         payloadCapacityKg: rPayloadKg ? parseInt(rPayloadKg) : 150,
         fuelType: rFuelType,
@@ -239,18 +346,33 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
     };
 
     onAddRentalItem(newRental);
-    setShowAddModal(false);
+    showToast(`✅ Véhicule "${newRental.title}" ajouté avec succès !`);
+
+    // Reset fields for the next vehicle
     setRTitle('');
     setRDesc('');
     setRImages([]);
+
+    if (!keepOpen) {
+      setShowAddModal(false);
+    }
   };
 
   // Filter items
+  const myMarketItems = useMemo(() => {
+    return currentUser ? marketplaceItems.filter((i) => i.sellerId === currentUser.id) : [];
+  }, [currentUser, marketplaceItems]);
+
+  const myRentals = useMemo(() => {
+    return currentUser ? rentalItems.filter((i) => i.ownerId === currentUser.id) : [];
+  }, [currentUser, rentalItems]);
+
   const filteredMarketplace = marketplaceItems.filter((item) => {
     const matchesSearch = !searchFilter || item.title.toLowerCase().includes(searchFilter.toLowerCase()) || item.description.toLowerCase().includes(searchFilter.toLowerCase());
     const matchesCity = cityFilter === 'all' || item.sellerCity.toLowerCase() === cityFilter.toLowerCase();
     const matchesCat = categoryFilter === 'all' || item.category === categoryFilter;
-    return matchesSearch && matchesCity && matchesCat;
+    const matchesMine = !showMyItemsOnly || item.sellerId === currentUser?.id;
+    return matchesSearch && matchesCity && matchesCat && matchesMine;
   });
 
   const filteredRentals = rentalItems.filter((rental) => {
@@ -432,6 +554,127 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
       {/* ========================================================================= */}
       {activeSubTab === 'market' && (
         <>
+          {/* Unlimited Items & Multi-inventory reassurance banner */}
+          <div className="bg-gradient-to-r from-blue-950/70 via-slate-900 to-indigo-950/70 border border-blue-800/40 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-black text-white text-xs flex items-center gap-1.5 flex-wrap">
+                  <span>Ventes & Dépôt d'Annonces Illimité</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                    100% GRATUIT & SANS RESTRICTION
+                  </span>
+                </p>
+                <p className="text-slate-300 text-[11px] mt-0.5 leading-relaxed">
+                  Chaque vendeur ou particulier peut mettre autant d'articles qu'il le souhaite en vente (équipements, casques, caissons, pièces détachées, etc.).
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+              {currentUser && (
+                <button
+                  type="button"
+                  onClick={() => setShowMyItemsOnly(!showMyItemsOnly)}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                    showMyItemsOnly
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 shadow'
+                      : 'bg-slate-900 text-amber-300 border-slate-700 hover:border-slate-600'
+                  }`}
+                  title="Filtrer mes articles uniquement"
+                >
+                  Mes articles : <strong className={showMyItemsOnly ? 'text-slate-950' : 'text-white'}>{myMarketItems.length}</strong>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-1.5 shadow transition-transform active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Publier un article</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Multi-Sharing & Bulk Actions Control Strip */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isSelectionMode) {
+                    clearSelection();
+                  } else {
+                    setIsSelectionMode(true);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  isSelectionMode
+                    ? 'bg-amber-400 text-slate-950 font-black shadow'
+                    : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                }`}
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>{isSelectionMode ? 'Quitter Sélection' : 'Mode Partage Multiple'}</span>
+                {selectedItemIds.size > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-slate-950 text-amber-300 text-[10px] font-black">
+                    {selectedItemIds.size}
+                  </span>
+                )}
+              </button>
+
+              {isSelectionMode && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => selectAllFilteredItems(filteredMarketplace)}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-amber-300 text-xs font-semibold border border-slate-700 transition-colors"
+                  >
+                    Tout sélectionner ({filteredMarketplace.length})
+                  </button>
+                  {selectedItemIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedItemIds(new Set())}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-400 text-xs font-semibold border border-slate-700 transition-colors"
+                    >
+                      Désélectionner
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* Filter: Only My items */}
+              {currentUser && (
+                <button
+                  type="button"
+                  onClick={() => setShowMyItemsOnly(!showMyItemsOnly)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors border ${
+                    showMyItemsOnly
+                      ? 'bg-blue-600/30 text-blue-300 border-blue-500/50'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200 border-slate-700'
+                  }`}
+                >
+                  Mes Annonces Uniquement
+                </button>
+              )}
+            </div>
+
+            {/* Direct Quick Share Action if items selected */}
+            {selectedItemIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => handleShareSelectedItems(marketplaceItems)}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-transform active:scale-95"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Partager ({selectedItemIds.size}) annonces</span>
+              </button>
+            )}
+          </div>
+
           {filteredMarketplace.length === 0 ? (
             <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-3">
               <ShoppingBag className="w-12 h-12 text-slate-600 mx-auto" />
@@ -452,19 +695,36 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                 const itemImages = item.images && item.images.length > 0 ? item.images : [item.imageUrl];
                 const activeImgIndex = carouselIndices[item.id] || 0;
                 const currentImg = itemImages[activeImgIndex] || itemImages[0];
+                const isSelected = selectedItemIds.has(item.id);
+                const isMyItem = currentUser && (item.sellerId === currentUser.id || currentUser.role === 'admin');
 
                 return (
                   <div
                     key={item.id}
-                    className="bg-slate-900 border border-slate-700/80 hover:border-blue-500/50 rounded-3xl overflow-hidden shadow-xl transition-all flex flex-col justify-between group"
+                    onClick={() => {
+                      if (isSelectionMode) toggleSelectItem(item.id);
+                    }}
+                    className={`bg-slate-900 border rounded-3xl overflow-hidden shadow-xl transition-all flex flex-col justify-between group relative ${
+                      isSelected
+                        ? 'border-amber-400 ring-2 ring-amber-400/50 scale-[1.01]'
+                        : 'border-slate-700/80 hover:border-blue-500/50'
+                    }`}
                   >
                     {/* Top Image Carousel Area */}
                     <div className="relative h-52 bg-slate-950 overflow-hidden">
                       <img
                         src={currentImg}
                         alt={item.title}
-                        className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 cursor-pointer"
-                        onClick={() => handleOpenLightbox(itemImages, item.title, `Vendu par ${item.sellerName} à ${item.sellerCity}`, activeImgIndex)}
+                        className={`w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 cursor-pointer ${
+                          item.isSold ? 'grayscale opacity-60' : ''
+                        }`}
+                        onClick={(e) => {
+                          if (isSelectionMode) {
+                            toggleSelectItem(item.id, e);
+                          } else {
+                            handleOpenLightbox(itemImages, item.title, `Vendu par ${item.sellerName} à ${item.sellerCity}`, activeImgIndex);
+                          }
+                        }}
                         referrerPolicy="no-referrer"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
@@ -472,8 +732,31 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                         }}
                       />
 
+                      {/* Selection Checkbox (always accessible or in selection mode) */}
+                      <button
+                        type="button"
+                        onClick={(e) => toggleSelectItem(item.id, e)}
+                        className={`absolute top-3 left-3 z-10 p-1.5 rounded-xl backdrop-blur transition-all shadow-md ${
+                          isSelected
+                            ? 'bg-amber-400 text-slate-950 ring-2 ring-slate-950'
+                            : 'bg-black/60 text-white/80 hover:text-white hover:bg-black/80'
+                        }`}
+                        title={isSelected ? 'Désélectionner' : 'Sélectionner pour partage multiple'}
+                      >
+                        {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                      </button>
+
+                      {/* Sold Banner Overlay */}
+                      {item.isSold && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center pointer-events-none">
+                          <span className="px-4 py-1.5 rounded-xl bg-red-600/90 text-white font-black text-sm tracking-widest uppercase shadow-xl rotate-[-6deg] border-2 border-white">
+                            VENDU / ÉPUISÉ
+                          </span>
+                        </div>
+                      )}
+
                       {/* Top Badges */}
-                      <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
+                      <div className="absolute top-3 left-12 flex items-center gap-1.5 flex-wrap">
                         <span className="bg-slate-950/85 backdrop-blur px-2.5 py-1 rounded-xl text-[10px] font-bold text-slate-200 border border-slate-700 shadow">
                           {item.condition === 'new' ? '✨ Neuf' : '👌 Occasion'}
                         </span>
@@ -565,7 +848,8 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                           <span>Discuter & Négocier (In-App)</span>
                         </button>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                          {/* Call Button */}
                           <a
                             href={`tel:${item.sellerPhone.replace(/\s+/g, '')}`}
                             className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors flex items-center justify-center shrink-0"
@@ -574,18 +858,72 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                             <Phone className="w-4 h-4 text-emerald-400" />
                           </a>
 
+                          {/* WhatsApp Chat Button */}
                           <a
                             href={`https://wa.me/${item.sellerPhone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
                               `Bonjour ${item.sellerName}, je souhaite acheter votre article sur Liencolis : "${item.title}" (${item.price} FCFA).`
                             )}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex-1 py-2 px-3 rounded-2xl bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs shadow flex items-center justify-center gap-1.5 transition-colors"
+                            className="flex-1 py-2 px-2.5 rounded-2xl bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs shadow flex items-center justify-center gap-1.5 transition-colors"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
                             <span>WhatsApp</span>
                           </a>
+
+                          {/* Share Item Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => handleShareSingleItem(item, e)}
+                            className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition-colors flex items-center justify-center shrink-0"
+                            title="Partager cette annonce"
+                          >
+                            <Share2 className="w-4 h-4 text-amber-400" />
+                          </button>
+
+                          {/* Copy Text Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopyItemText(item, e)}
+                            className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center justify-center shrink-0"
+                            title="Copier le texte de l'annonce"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
                         </div>
+
+                        {/* Owner / Admin Management Bar */}
+                        {isMyItem && (
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleMarketplaceItemSold?.(item.id);
+                              }}
+                              className={`flex-1 py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-colors ${
+                                item.isSold
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              }`}
+                            >
+                              {item.isSold ? 'Remettre en vente' : 'Marquer comme vendu'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('Supprimer définitivement cette annonce ?')) {
+                                  onDeleteMarketplaceItem?.(item.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 transition-colors"
+                              title="Supprimer l'annonce"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -601,6 +939,41 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
       {/* ========================================================================= */}
       {activeSubTab === 'rentals' && (
         <>
+          {/* Fleets & Rentals Reassurance Banner */}
+          <div className="bg-gradient-to-r from-amber-950/60 via-slate-900 to-orange-950/60 border border-amber-800/40 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                <Bike className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-black text-white text-xs flex items-center gap-1.5 flex-wrap">
+                  <span>Parc & Flotte de Véhicules en Location</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                    MULTI-VÉHICULES
+                  </span>
+                </p>
+                <p className="text-slate-300 text-[11px] mt-0.5 leading-relaxed">
+                  Propriétaires et loueurs d'engins : enregistrez plusieurs motos, tricycles cargo à benne ou camionnettes dans votre parc de location.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+              {currentUser && (
+                <span className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-[11px] font-bold text-amber-300">
+                  Mes engins enregistrés : <strong className="text-white">{myRentals.length}</strong>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow transition-transform active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Ajouter un véhicule</span>
+              </button>
+            </div>
+          </div>
+
           {filteredRentals.length === 0 ? (
             <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-3xl space-y-3">
               <Bike className="w-12 h-12 text-slate-600 mx-auto" />
@@ -971,7 +1344,7 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
             </div>
 
             {activeSubTab === 'market' ? (
-              <form onSubmit={handleCreateMarketItem} className="space-y-4 text-xs">
+              <form onSubmit={(e) => { e.preventDefault(); executeSaveMarketItem(false); }} className="space-y-4 text-xs">
                 <div>
                   <label className="font-bold text-slate-200 block mb-1">Titre de l'Annonce *</label>
                   <input
@@ -1063,24 +1436,33 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                   />
                 </div>
 
-                <div className="flex items-center gap-3 pt-2">
+                <div className="flex flex-wrap items-center gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs"
+                    className="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs"
                   >
-                    Annuler
+                    Fermer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => executeSaveMarketItem(true)}
+                    className="flex-1 py-3 px-3 rounded-2xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    title="Enregistre cet article et permet d'en saisir immédiatement un autre"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Publier & Ajouter un Autre Article</span>
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-blue-500/20"
+                    className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    Publier l'Article sur Liencolis
+                    <span>Publier & Terminer</span>
                   </button>
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleCreateRentalItem} className="space-y-4 text-xs">
+              <form onSubmit={(e) => { e.preventDefault(); executeSaveRentalItem(false); }} className="space-y-4 text-xs">
                 <div>
                   <label className="font-bold text-slate-200 block mb-1">Modèle / Nom du Véhicule *</label>
                   <input
@@ -1214,19 +1596,28 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                   />
                 </div>
 
-                <div className="flex items-center gap-3 pt-2">
+                <div className="flex flex-wrap items-center gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs"
+                    className="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs"
                   >
-                    Annuler
+                    Fermer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => executeSaveRentalItem(true)}
+                    className="flex-1 py-3 px-3 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    title="Enregistre cet engin et permet d'en ajouter immédiatement un autre à votre flotte"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Publier & Ajouter un Autre Véhicule</span>
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20"
+                    className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    Publier l'Engin en Location
+                    <span>Publier & Terminer</span>
                   </button>
                 </div>
               </form>
@@ -1243,6 +1634,51 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
         title={lightboxTitle}
         subtitle={lightboxSubtitle}
       />
+
+      {/* Floating Sticky Toolbar for Multi-Selection & Sharing */}
+      {selectedItemIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border-2 border-amber-400 text-white px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 max-w-xl w-[92vw] animate-in slide-in-from-bottom-5">
+          <div className="flex items-center gap-2.5">
+            <span className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-black flex items-center justify-center text-xs shadow">
+              {selectedItemIds.size}
+            </span>
+            <div>
+              <p className="text-xs font-black text-white leading-none">
+                {selectedItemIds.size} annonce{selectedItemIds.size > 1 ? 's' : ''} sélectionnée{selectedItemIds.size > 1 ? 's' : ''}
+              </p>
+              <p className="text-[10px] text-amber-300/90 font-medium mt-0.5">
+                Prêt pour diffusion en groupe ou WhatsApp
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleShareSelectedItems(marketplaceItems)}
+              className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-transform active:scale-95"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Partager le pack</span>
+            </button>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              title="Annuler la sélection"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {shareToast && (
+        <div className="fixed top-6 right-6 z-50 bg-amber-400 text-slate-950 px-4 py-2.5 rounded-2xl shadow-2xl font-black text-xs flex items-center gap-2 animate-in fade-in slide-in-from-top-3 border border-amber-300">
+          <CheckCircle className="w-4 h-4 text-slate-950" />
+          <span>{shareToast}</span>
+        </div>
+      )}
 
       {/* Direct In-App Chat Modal */}
       <DirectChatModal

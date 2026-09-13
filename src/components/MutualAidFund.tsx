@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AidRequest, UserProfile } from '../types';
 import { notificationService } from '../services/notificationService';
 import { storageService } from '../services/storageService';
+import { referralService, AmbassadorInfo } from '../services/referralService';
 import confetti from 'canvas-confetti';
 import {
   HeartHandshake,
@@ -31,6 +32,12 @@ import {
   ChevronRight,
   DollarSign,
   Fuel,
+  Share2,
+  Copy,
+  Award,
+  Gift,
+  Bike,
+  Building2,
 } from 'lucide-react';
 
 interface MutualAidFundProps {
@@ -49,7 +56,7 @@ interface CriterionItem {
   description: string;
   status: 'pass' | 'fail' | 'warn';
   actionPrompt?: string;
-  actionType?: 'kyc' | 'wallet' | 'deliveries' | 'ratings' | 'charter';
+  actionType?: 'kyc' | 'wallet' | 'deliveries' | 'ratings' | 'charter' | 'referrals';
 }
 
 export const MutualAidFund: React.FC<MutualAidFundProps> = ({
@@ -60,16 +67,18 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
   isDarkMode,
 }) => {
   // Navigation within the Financial Aid module
-  const [activeSubTab, setActiveSubTab] = useState<'emergency' | 'eligibility' | 'rules'>('emergency');
+  const [activeSubTab, setActiveSubTab] = useState<'emergency' | 'eligibility' | 'ambassador' | 'rules'>('emergency');
 
   // Modals & Action States
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [colleagueInviteInput, setColleagueInviteInput] = useState('');
+  const [isCodeCopied, setIsCodeCopied] = useState(false);
 
   // Emergency aid request form fields
   const [incidentType, setIncidentType] = useState<'breakdown' | 'accident' | 'health_emergency' | 'spare_parts' | 'other'>('breakdown');
-  const [requestedAmount, setRequestedAmount] = useState('20000');
+  const [requestedAmount, setRequestedAmount] = useState('5000');
   const [incidentDesc, setIncidentDesc] = useState('');
   const [momoNumber, setMomoNumber] = useState(currentUser?.phone || '+229 01 69 81 46 31');
   const [incidentCity, setIncidentCity] = useState(currentUser?.city || 'Cotonou');
@@ -88,7 +97,27 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
     isEligible: boolean;
     tier: 'gold' | 'silver' | 'bronze' | 'ineligible';
     criteria: CriterionItem[];
+    ambassador: AmbassadorInfo;
   } => {
+    const dummyAmbassador: AmbassadorInfo = {
+      referralCode: 'LC-BENIN',
+      referralCount: 0,
+      tier: 'bronze',
+      tierLabel: 'Débutant',
+      bonusAidScore: 0,
+      maxAidCeilingFcfa: 25000,
+      bonusAidCeilingFcfa: 0,
+      isFastTrackPriority: false,
+      isPrivilegedSubscriber: false,
+      privilegedBadgeLabel: 'Abonné',
+      clientSharesCount: 0,
+      whatsappInviteText: '',
+      whatsappClientInviteText: '',
+      whatsappBusinessInviteText: '',
+      policyNote: '',
+      nextTierProgress: { nextTierName: 'Argent', referralsNeeded: 2, percentComplete: 0 },
+    };
+
     if (!user) {
       return {
         score: 0,
@@ -104,16 +133,18 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
             status: 'fail',
           },
         ],
+        ambassador: dummyAmbassador,
       };
     }
 
-    let score = 0;
+    const ambassador = referralService.getAmbassadorInfo(user);
+    let baseScore = 0;
     const criteria: CriterionItem[] = [];
 
     // 1. Identification & KYC Certifié (30 points)
     const isKycValid = user.isCertified || user.kycStatus === 'approved';
     if (isKycValid) {
-      score += 30;
+      baseScore += 30;
       criteria.push({
         id: 'kyc',
         label: 'Identité Chauffeur Validée (KYC)',
@@ -123,7 +154,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
         status: 'pass',
       });
     } else if (user.kycStatus === 'pending') {
-      score += 15;
+      baseScore += 15;
       criteria.push({
         id: 'kyc',
         label: 'Pièce d’identité en cours de vérification',
@@ -150,7 +181,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
     // 2. Activité & Historique de Courses (25 points)
     const completed = user.completedDeliveries || 0;
     if (completed >= 15) {
-      score += 25;
+      baseScore += 25;
       criteria.push({
         id: 'deliveries',
         label: 'Historique de Courses Réussies',
@@ -160,7 +191,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
         status: 'pass',
       });
     } else if (completed >= 5) {
-      score += 15;
+      baseScore += 15;
       criteria.push({
         id: 'deliveries',
         label: 'Activité en Progression',
@@ -187,7 +218,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
     // 3. Évaluation & Ponctualité Client (20 points)
     const rating = user.rating || 5.0;
     if (rating >= 4.5) {
-      score += 20;
+      baseScore += 20;
       criteria.push({
         id: 'ratings',
         label: 'Excellence & Retours Clients',
@@ -197,7 +228,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
         status: 'pass',
       });
     } else if (rating >= 3.8) {
-      score += 12;
+      baseScore += 12;
       criteria.push({
         id: 'ratings',
         label: 'Satisfaction Client Conforme',
@@ -220,7 +251,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
     // 4. Situation du Portefeuille (15 points)
     const balance = user.driverWallet?.balance || 0;
     if (balance >= 0) {
-      score += 15;
+      baseScore += 15;
       criteria.push({
         id: 'wallet',
         label: 'Compte & Commissions en Règle',
@@ -243,7 +274,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
     }
 
     // 5. Engagement Solidaire & Réciprocité (10 points)
-    score += 10;
+    baseScore += 10;
     criteria.push({
       id: 'charter',
       label: 'Engagement Moral de Remboursement',
@@ -253,23 +284,135 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
       status: 'pass',
     });
 
+    // 6. Bouche-à-Oreille & Ambassadeur Liencolis (+25 points d'aide !)
+    if (ambassador.referralCount >= 7) {
+      criteria.push({
+        id: 'referrals',
+        label: 'Super Ambassadeur Diamant (+25 pts Bonus)',
+        points: 25,
+        maxPoints: 25,
+        description: `Réseau étendu : ${ambassador.referralCount} confrères parrainés ! Coupe-file prioritaire et plafond d’avance boosté à 80 000 FCFA.`,
+        status: 'pass',
+      });
+    } else if (ambassador.referralCount >= 4) {
+      criteria.push({
+        id: 'referrals',
+        label: 'Ambassadeur Or Liencolis (+20 pts Bonus)',
+        points: 20,
+        maxPoints: 25,
+        description: `${ambassador.referralCount} confrères parrainés. Score d'éligibilité boosté de +20 pts et plafond d'aide augmenté à 60 000 FCFA.`,
+        status: 'pass',
+      });
+    } else if (ambassador.referralCount >= 2) {
+      criteria.push({
+        id: 'referrals',
+        label: 'Ambassadeur Argent Actif (+10 pts Bonus)',
+        points: 10,
+        maxPoints: 25,
+        description: `${ambassador.referralCount} confrères parrainés. Score augmenté de +10 pts et plafond d'aide porté à 40 000 FCFA.`,
+        status: 'warn',
+        actionPrompt: 'Inviter un collègue (+10 pts)',
+        actionType: 'referrals',
+      });
+    } else if (ambassador.referralCount === 1) {
+      criteria.push({
+        id: 'referrals',
+        label: 'Bouche-à-Oreille Initié (+5 pts Bonus)',
+        points: 5,
+        maxPoints: 25,
+        description: '1 confrère parrainé. Parrainez encore 1 collègue pour atteindre le palier Argent (+10 pts) !',
+        status: 'warn',
+        actionPrompt: 'Partager mon code WhatsApp',
+        actionType: 'referrals',
+      });
+    } else {
+      criteria.push({
+        id: 'referrals',
+        label: 'Bouche-à-Oreille & Parrainage (0/25 pts)',
+        points: 0,
+        maxPoints: 25,
+        description: 'Faites découvrir Liencolis à vos collègues pour faire grimper immédiatement votre éligibilité de +10 à +25 pts et étendre votre plafond d’aide !',
+        status: 'fail',
+        actionPrompt: 'Faire grimper mon éligibilité',
+        actionType: 'referrals',
+      });
+    }
+
+    // Le score total inclut le bonus d'ambassadeur plafonné à 100
+    const score = Math.min(100, baseScore + ambassador.bonusAidScore);
+
     const isEligible = score >= 70;
     let tier: 'gold' | 'silver' | 'bronze' | 'ineligible' = 'ineligible';
     if (score >= 90) tier = 'gold';
     else if (score >= 75) tier = 'silver';
     else if (score >= 70) tier = 'bronze';
 
-    return { score, isEligible, tier, criteria };
+    return { score, isEligible, tier, criteria, ambassador };
   };
 
   const eligibility = calculateEligibility(currentUser);
+
+  // Quick Action for Referral
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(eligibility.ambassador.referralCode);
+    setIsCodeCopied(true);
+    setTimeout(() => setIsCodeCopied(false), 2500);
+  };
+
+  const handleShareWhatsApp = (target: 'driver' | 'client' | 'business' = 'driver') => {
+    let msg = eligibility.ambassador.whatsappInviteText;
+    if (target === 'client') {
+      msg = eligibility.ambassador.whatsappClientInviteText;
+    } else if (target === 'business') {
+      msg = eligibility.ambassador.whatsappBusinessInviteText;
+    }
+    referralService.shareOnWhatsApp(msg);
+
+    // Record share and grant/update Privileged Subscriber status
+    const res = referralService.recordShareAction(target);
+    if (res.updatedUser) {
+      if (res.wasPromoted) {
+        confetti({ particleCount: 75, spread: 70, origin: { y: 0.6 } });
+        setFeedbackMessage({
+          type: 'success',
+          text: `⭐ FÉLICITATIONS ! Votre badge "Abonné Privilégié" est activé ! En cas de demande de livreur, vos courses seront traitées en priorité par les chauffeurs disponibles.`,
+        });
+        notificationService.sendPushNotification({
+          type: 'recruitment',
+          title: '⭐ Badge Abonné Privilégié Débloqué !',
+          body: 'Merci pour votre partage. Vos prochaines demandes de livreurs sur Liencolis seront prioritaires !',
+        });
+      }
+    }
+  };
+
+  const handleSimulateReferral = (e: React.FormEvent) => {
+    e.preventDefault();
+    const colleagueName = colleagueInviteInput.trim() || 'Confrère Chauffeur Cotonou';
+    if (!currentUser) return;
+
+    const success = referralService.registerReferral(eligibility.ambassador.referralCode, colleagueName);
+    if (success) {
+      confetti({ particleCount: 70, spread: 70, origin: { y: 0.5 } });
+      setColleagueInviteInput('');
+      setFeedbackMessage({
+        type: 'success',
+        text: `🎉 Super ! Le parrainage de "${colleagueName}" a été validé. Votre score d'aide financière et votre plafond d'avance ont grimpé !`,
+      });
+      notificationService.sendPushNotification({
+        type: 'recruitment',
+        title: '📈 Éligibilité Aide Financière Boostée !',
+        body: `Grâce à votre parrainage de ${colleagueName}, vos points d’éligibilité à la caisse de solidarité viennent d’augmenter.`,
+      });
+    }
+  };
 
   // Handler for Submitting an Emergency Aid Request
   const handleSubmitAidRequest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!incidentDesc.trim() || !requestedAmount) return;
 
-    const amountNum = parseInt(requestedAmount) || 20000;
+    const amountNum = parseInt(requestedAmount) || 5000;
     const driverPhoneNum = momoNumber.trim() || currentUser?.phone || '+229 01 69 81 46 31';
 
     const newReq: AidRequest = {
@@ -283,8 +426,12 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
       requestedAmount: amountNum,
       status: 'pending',
       eligibilityScore: eligibility.score,
+      referralCountAtRequest: eligibility.ambassador.referralCount,
+      isAmbassadorPriority: eligibility.ambassador.isFastTrackPriority,
       repaymentStatus: 'in_progress',
-      adminNotes: 'Dossier d’aide financière reçu. Déblocage express via MTN MoMo / Moov Money après validation.',
+      adminNotes: eligibility.ambassador.isFastTrackPriority
+        ? '⚡ DOSSIER PRIORITAIRE COUPE-FILE (Super Ambassadeur). Déblocage express MTN MoMo sous 30 min.'
+        : 'Dossier d’aide financière reçu. Déblocage express via MTN MoMo / Moov Money après validation.',
       createdAt: new Date().toISOString(),
     };
 
@@ -295,7 +442,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
     confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
     setFeedbackMessage({
       type: 'success',
-      text: `Votre demande d’aide de ${amountNum.toLocaleString()} FCFA a été soumise avec succès. Traitement sous 30 minutes.`,
+      text: `Votre demande d’aide de ${amountNum.toLocaleString()} FCFA a été soumise avec succès. Traitement prioritaire en cours.`,
     });
 
     notificationService.sendPushNotification({
@@ -424,6 +571,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
         {[
           { id: 'emergency', label: 'Demandes d’Aide & Avances (0%)', icon: HeartPulse, badge: aidRequests.length },
           { id: 'eligibility', label: 'Conditions d’Éligibilité & Barème', icon: Activity, score: `${eligibility.score}%` },
+          { id: 'ambassador', label: 'Bouche-à-Oreille & Parrainage Chauffeur', icon: Gift, score: `+${eligibility.ambassador.bonusAidScore} pts` },
           { id: 'rules', label: 'Règlement & Conditions d’Octroi', icon: Scale },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -432,7 +580,7 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id as any)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 isActive
                   ? 'bg-slate-800 text-rose-300 border border-rose-400/40 shadow-sm ring-1 ring-rose-400/30'
                   : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent'
@@ -448,7 +596,9 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
               {tab.score && (
                 <span
                   className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-                    eligibility.isEligible
+                    tab.id === 'ambassador'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : eligibility.isEligible
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                       : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   }`}
@@ -491,11 +641,35 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
               {/* Action Button */}
               <button
                 onClick={() => setShowApplyModal(true)}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>Ouvrir le Formulaire de Demande</span>
+                <span>Demander une Aide Financière (Dès 5 000 FCFA • Plafond : {eligibility.ambassador.maxAidCeilingFcfa.toLocaleString()} F)</span>
               </button>
+
+              {/* Bouche-à-Oreille Quick-Callout */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-amber-300 flex items-center gap-1.5">
+                    <Gift className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Bouche-à-Oreille Chauffeur</span>
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 font-mono text-[9px] font-bold">
+                    +{eligibility.ambassador.bonusAidScore} pts ajoutés
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-snug">
+                  Parrainez vos collègues livreurs (zéro argent en cash) : votre note d'éligibilité grimpe immédiatement et votre avance passe de 5 000 F jusqu'à 80 000 FCFA ! Pour particuliers et entreprises, le partage est 100% gratuit et bénévole.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('ambassador')}
+                  className="w-full py-1.5 px-2.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-[10px] font-bold border border-amber-400/30 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Award className="w-3 h-3" />
+                  <span>Partager mon Code Parrain ({eligibility.ambassador.referralCode})</span>
+                </button>
+              </div>
 
               <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-[11px] text-slate-300">
                 <p className="font-bold text-white flex items-center gap-1.5">
@@ -749,8 +923,344 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
                         {item.points}/{item.maxPoints} pts
                       </span>
                     </div>
+
+                    {item.actionPrompt && (
+                      <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">Opportunité d'augmentation :</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (item.actionType === 'referrals') {
+                              setActiveSubTab('ambassador');
+                            } else if (item.actionType === 'wallet') {
+                              onOpenPayment('wallet_deposit_1200');
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 font-bold text-[10px] border border-amber-400/30 flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <span>{item.actionPrompt}</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW: Programme de Parrainage & Éligibilité Aide Financière */}
+      {activeSubTab === 'ambassador' && (
+        <div className="space-y-4 animate-in fade-in">
+          {/* Hero Banner: Le Parrainage qui fait grimper l'aide financière */}
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 border border-amber-500/40 shadow-xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                  <Gift className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-black text-white">Programme Parrainage &amp; Bouche-à-Oreille Solidaire</h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      100% Gratuit • Zéro Commission d'Argent
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      +{eligibility.ambassador.bonusAidScore} Pts au Score d'Aide
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Le parrainage ne distribue <strong>aucun argent en cash</strong>. Pour les livreurs, il fait grimper votre <strong>taux d'éligibilité</strong> et votre plafond d'avance de solidarité (5 000 à 80 000 F). Pour les <strong>particuliers et entreprises</strong>, le partage du lien est <strong>100% gratuit et bénévole</strong> pour soutenir le réseau local.
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/30 text-right shrink-0">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Votre Palier Solidaire</span>
+                <span className="text-xs font-black text-amber-300 flex items-center justify-end gap-1 mt-0.5">
+                  <Award className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{eligibility.ambassador.tierLabel}</span>
+                </span>
+                <span className="text-[11px] font-mono text-emerald-400 font-bold block mt-0.5">
+                  Plafond d'aide : {eligibility.ambassador.maxAidCeilingFcfa.toLocaleString()} FCFA
+                </span>
+              </div>
+            </div>
+
+            {/* CHARTE OFFICIELLE DU PARRAINAGE : ZÉRO ARGENT / 100% SOLIDAIRE */}
+            <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2.5 text-xs">
+              <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>Règle Officielle : Zéro Commission d'Argent • Recommandation Solidaire</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-[11px]">
+                <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
+                  <span className="font-bold text-emerald-300 flex items-center gap-1">
+                    <Bike className="w-3.5 h-3.5" />
+                    <span>Pour les Livreurs &amp; Chauffeurs :</span>
+                  </span>
+                  <p className="text-slate-300 leading-relaxed">
+                    Pas d'argent distribué. Vos parrainages servent <strong>exclusivement à booster votre note d'éligibilité (+10 à +25 pts)</strong> et à débloquer votre <strong>plafond d'avance sans intérêt de 5 000 F à 80 000 FCFA</strong> avec coupe-file d'urgence.
+                  </p>
+                </div>
+                <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
+                  <span className="font-bold text-amber-300 flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Pour les Particuliers &amp; Entreprises (Badge Privilégié) :</span>
+                  </span>
+                  <p className="text-slate-300 leading-relaxed">
+                    Pas d'argent en cash, mais un <strong>Badge d'Abonné Privilégié ⭐</strong> ! Dès que vous partagez le lien, vous débloquez ce statut exclusif : <strong>en cas de demande de livreur, vos courses sont prioritaires</strong> et traitées en premier par les chauffeurs disponibles.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress bar to next tier */}
+            <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">
+                  Progression vers le palier supérieur ({eligibility.ambassador.nextTierProgress.nextTierName}) :
+                </span>
+                <span className="font-bold text-amber-400 font-mono">
+                  {eligibility.ambassador.referralCount} collègue(s) parrainé(s)
+                </span>
+              </div>
+              <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full transition-all duration-500"
+                  style={{ width: `${eligibility.ambassador.nextTierProgress.percentComplete}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-slate-400">
+                {eligibility.ambassador.nextTierProgress.referralsNeeded > 0
+                  ? `Plus que ${eligibility.ambassador.nextTierProgress.referralsNeeded} parrainage(s) pour débloquer le palier ${eligibility.ambassador.nextTierProgress.nextTierName} et faire grimper votre note d'aide !`
+                  : 'Félicitations ! Vous avez atteint le palier maximal Diamant avec coupe-file prioritaire garanti.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Grid: Code Partage + Simulation & Formulaire */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Left Col (5 cols): Votre Code & Partage WhatsApp */}
+            <div className="lg:col-span-5 space-y-3.5">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-md space-y-4">
+                <div className="border-b border-slate-800 pb-2.5">
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Share2 className="w-4 h-4 text-emerald-400" />
+                    <span>Votre Code Parrain Solidaire</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">À communiquer à vos collègues, clients ou partenaires.</p>
+                </div>
+
+                {/* Big Code Box */}
+                <div className="p-4 rounded-xl bg-slate-950 border border-amber-400/30 text-center space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                    Code de Parrainage
+                  </span>
+                  <div className="text-2xl font-black font-mono tracking-widest text-amber-400 py-1 bg-amber-400/10 rounded-lg border border-amber-400/20">
+                    {eligibility.ambassador.referralCode}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyCode}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {isCodeCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{isCodeCopied ? 'Code Copié !' : 'Copier le Code'}</span>
+                    </button>
+                  </div>
+
+                  {/* Badge d'Abonné Privilégié Indicator */}
+                  {eligibility.ambassador.isPrivilegedSubscriber ? (
+                    <div className="mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center gap-2 text-left">
+                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                      <div>
+                        <span className="text-[11px] font-black text-amber-300 block">
+                          {eligibility.ambassador.privilegedBadgeLabel}
+                        </span>
+                        <span className="text-[10px] text-slate-300">
+                          Priorité de traitement accordée lors de vos demandes de livreur ({eligibility.ambassador.clientSharesCount} partage(s)).
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-2 rounded-xl bg-slate-900 border border-slate-800 text-[10px] text-slate-400 text-left flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>Partagez le lien ci-dessous pour débloquer votre <strong>Badge d'Abonné Privilégié</strong> !</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* WhatsApp Share Options (Livreurs, Particuliers, Entreprises) */}
+                <div className="space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Partager sur WhatsApp (3 Formats Disponibles) :
+                  </span>
+
+                  {/* 1. Vers Confrère Livreur */}
+                  <button
+                    type="button"
+                    onClick={() => handleShareWhatsApp('driver')}
+                    className="w-full py-2.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md flex items-center justify-between gap-2 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Bike className="w-4 h-4 text-emerald-200" />
+                      <span className="text-left">
+                        <span className="block font-black">1. Inviter un Confrère Livreur</span>
+                        <span className="text-[10px] text-emerald-100 font-normal">Booste votre éligibilité d'aide solidaire</span>
+                      </span>
+                    </div>
+                    <Share2 className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
+                  </button>
+
+                  {/* 2. Vers Particulier / Client (Gratuit, 0 F d'argent) */}
+                  <button
+                    type="button"
+                    onClick={() => handleShareWhatsApp('client')}
+                    className="w-full py-2.5 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-xs border border-slate-700 flex items-center justify-between gap-2 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-amber-400" />
+                      <span className="text-left">
+                        <span className="block font-black text-amber-300">2. Partager aux Particuliers (Amis/Famille)</span>
+                        <span className="text-[10px] text-slate-400 font-normal">100% Gratuit • Recommander un coursier sérieux</span>
+                      </span>
+                    </div>
+                    <Share2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  </button>
+
+                  {/* 3. Vers Entreprise / Boutique (Gratuit, 0 F d'argent) */}
+                  <button
+                    type="button"
+                    onClick={() => handleShareWhatsApp('business')}
+                    className="w-full py-2.5 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-xs border border-slate-700 flex items-center justify-between gap-2 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-blue-400" />
+                      <span className="text-left">
+                        <span className="block font-black text-blue-300">3. Partager aux Entreprises &amp; Boutiques</span>
+                        <span className="text-[10px] text-slate-400 font-normal">100% Gratuit • Pour expédier leurs commandes</span>
+                      </span>
+                    </div>
+                    <Share2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  </button>
+                </div>
+
+                {/* Enregistrer un parrainage réussi en direct */}
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Enregistrer un Confrère Livreur Invité :
+                  </span>
+                  <form onSubmit={handleSimulateReferral} className="space-y-2">
+                    <input
+                      type="text"
+                      value={colleagueInviteInput}
+                      onChange={(e) => setColleagueInviteInput(e.target.value)}
+                      placeholder="Nom ou Numéro du confrère invité..."
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="submit"
+                      className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-amber-400 hover:text-slate-950 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Valider &amp; Faire Grimper Mon Éligibilité</span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Col (7 cols): Barème des 4 Paliers Solidaires */}
+            <div className="lg:col-span-7 space-y-3.5">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-md space-y-3">
+                <div className="border-b border-slate-800 pb-2.5">
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-amber-400" />
+                    <span>Barème des 4 Paliers de Parrainage &amp; Impact Aide</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Plus vous faites grandir la famille Liencolis, plus la communauté vous soutient financièrement.
+                  </p>
+                </div>
+
+                <div className="space-y-2.5">
+                  {[
+                    {
+                      tier: 'bronze',
+                      label: 'Palier 1 : Ambassadeur Débutant',
+                      condition: '0 à 1 confrère parrainé',
+                      scoreBonus: '+0 pt',
+                      ceiling: '5 000 à 25 000 FCFA',
+                      delay: 'Délai standard 72h',
+                      color: 'border-slate-800 bg-slate-950',
+                      isActive: eligibility.ambassador.tier === 'bronze',
+                    },
+                    {
+                      tier: 'silver',
+                      label: 'Palier 2 : Ambassadeur Argent',
+                      condition: '2 à 3 confrères parrainés',
+                      scoreBonus: '+10 pts d’aide',
+                      ceiling: '5 000 à 40 000 FCFA (+15 000 F)',
+                      delay: 'Traitement sous 48h',
+                      color: 'border-slate-600 bg-slate-900/60',
+                      isActive: eligibility.ambassador.tier === 'silver',
+                    },
+                    {
+                      tier: 'gold',
+                      label: 'Palier 3 : Ambassadeur Or (Leader)',
+                      condition: '4 à 6 confrères parrainés',
+                      scoreBonus: '+20 pts d’aide',
+                      ceiling: '5 000 à 60 000 FCFA (+35 000 F)',
+                      delay: 'Traitement express sous 24h',
+                      color: 'border-amber-500/40 bg-amber-950/20',
+                      isActive: eligibility.ambassador.tier === 'gold',
+                    },
+                    {
+                      tier: 'diamond',
+                      label: 'Palier 4 : Pilier Diamant Réseau',
+                      condition: '7+ confrères parrainés',
+                      scoreBonus: '+25 pts d’aide (Max)',
+                      ceiling: '5 000 à 80 000 FCFA (+55 000 F)',
+                      delay: '⚡ COUPE-FILE PRIORITAIRE (30 min)',
+                      color: 'border-emerald-500/40 bg-emerald-950/20',
+                      isActive: eligibility.ambassador.tier === 'diamond',
+                    },
+                  ].map((p, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-xl border transition-all text-xs ${p.color} ${
+                        p.isActive ? 'ring-2 ring-amber-400 shadow-md' : 'opacity-80'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-bold text-white text-xs">{p.label}</p>
+                            {p.isActive && (
+                              <span className="px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase">
+                                Actuel
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{p.condition}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-amber-400 text-xs block">{p.scoreBonus}</span>
+                          <span className="text-[10px] text-emerald-400 font-bold block">Plafond : {p.ceiling}</span>
+                        </div>
+                      </div>
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Vitesse déblocage : <strong className="text-slate-200">{p.delay}</strong></span>
+                        <span>Avance à taux 0%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -877,6 +1387,19 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
                 </div>
               </div>
 
+              {/* Ambassador Bonus Status in Modal */}
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-1.5 text-amber-300">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  <span className="font-bold">
+                    Statut {eligibility.ambassador.tierLabel} : +{eligibility.ambassador.bonusAidScore} pts bonus
+                  </span>
+                </div>
+                <span className="font-black text-amber-200 font-mono">
+                  Plafond max : {eligibility.ambassador.maxAidCeilingFcfa.toLocaleString()} FCFA
+                </span>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="font-semibold text-slate-300 block mb-1">Montant Requis (FCFA) *</label>
@@ -884,14 +1407,34 @@ export const MutualAidFund: React.FC<MutualAidFundProps> = ({
                     type="number"
                     required
                     min="5000"
-                    max="50000"
+                    max={eligibility.ambassador.maxAidCeilingFcfa}
                     step="1000"
                     value={requestedAmount}
                     onChange={(e) => setRequestedAmount(e.target.value)}
-                    placeholder="20000"
+                    placeholder="5000"
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 font-bold text-xs focus:outline-none focus:ring-1.5 focus:ring-rose-500"
                   />
-                  <span className="text-[9px] text-slate-500 mt-0.5 block">De 5 000 à 50 000 FCFA à taux 0%</span>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {[5000, 10000, 15000, 20000, 25000, 40000, 60000, 80000]
+                      .filter((amt) => amt <= eligibility.ambassador.maxAidCeilingFcfa)
+                      .map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setRequestedAmount(amt.toString())}
+                          className={`px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all cursor-pointer ${
+                            parseInt(requestedAmount) === amt
+                              ? 'bg-rose-500 text-white font-black ring-1 ring-rose-400 shadow'
+                              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                        >
+                          {amt >= 1000 ? `${amt / 1000}k` : amt}F {amt === 5000 ? '★ Base' : ''}
+                        </button>
+                      ))}
+                  </div>
+                  <span className="text-[9px] text-slate-400 mt-1 block">
+                    Aide accessible dès 5 000 FCFA (plafond jusqu'à {eligibility.ambassador.maxAidCeilingFcfa.toLocaleString()} FCFA à taux 0%)
+                  </span>
                 </div>
 
                 <div>

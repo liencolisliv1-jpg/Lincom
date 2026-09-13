@@ -27,6 +27,7 @@ import {
   DirectConversation,
   DirectConversationMessage,
   CustomChatGroup,
+  AppLicense,
 } from '../types';
 
 export const firestoreService = {
@@ -437,6 +438,51 @@ export const firestoreService = {
       await setDoc(notifRef, notif, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `pushNotifications/${notif.id}`);
+    }
+  },
+
+  // Sync License to Firestore Cloud
+  async saveLicense(license: AppLicense): Promise<void> {
+    try {
+      const licRef = doc(db, 'licenses', license.id);
+      await setDoc(licRef, license, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `licenses/${license.id}`);
+    }
+  },
+
+  // Delete License from Firestore Cloud
+  async deleteLicense(licenseId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'licenses', licenseId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `licenses/${licenseId}`);
+    }
+  },
+
+  // Real-time listener for Licenses
+  subscribeLicenses(callback: (licenses: AppLicense[]) => void): () => void {
+    try {
+      const q = query(collection(db, 'licenses'), limit(100));
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: AppLicense[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push(docSnap.data() as AppLicense);
+            });
+            list.sort((a, b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
+            callback(list);
+          }
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'licenses');
+        }
+      );
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'licenses');
+      return () => {};
     }
   },
 };

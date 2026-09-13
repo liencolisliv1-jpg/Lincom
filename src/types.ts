@@ -1,6 +1,29 @@
 export type UserRole = 'driver' | 'client' | 'merchant' | 'admin';
 export type VehicleType = 'moto_2wheels' | 'tricycle' | 'car_4wheels';
 export type PricingPlan = 'subscription' | 'commission';
+export type LicenseType = 'subscription_2wheels' | 'subscription_tricycle' | 'subscription_4wheels' | 'vip_badge' | 'fleet_enterprise' | 'custom';
+export type LicenseStatus = 'active' | 'expired' | 'trial' | 'suspended' | 'pending';
+
+export interface AppLicense {
+  id: string;
+  licenseKey: string; // e.g. "LC-MOTO-2026-8942", "LC-VIP-3419"
+  licenseType: LicenseType;
+  title: string;
+  targetUserId?: string;
+  targetUserName?: string;
+  targetUserPhone?: string;
+  driverVehicleType?: VehicleType;
+  durationDays: number;
+  priceFcfa: number;
+  status: LicenseStatus;
+  issuedAt: string;
+  activatedAt?: string;
+  expiresAt: string;
+  grantedBy: 'admin_manual' | 'fedapay' | 'kkiapay' | 'system' | 'voucher_card';
+  features: string[];
+  maxDeliveriesPerMonth?: number; // -1 = illimité
+  notes?: string;
+}
 
 export interface AdminCommissionWithdrawal {
   id: string;
@@ -86,6 +109,17 @@ export interface UserProfile {
   rating: number;
   totalRatingsCount: number;
   completedDeliveries: number;
+  // Bouche-à-oreille & Parrainage
+  referralCode?: string; // Code personnel ex: "LC-GERMAIN-229"
+  referredByCode?: string; // Code du parrain qui l'a invité
+  referralCount?: number; // Nombre de collègues parrainés
+  referralBonusAidPoints?: number; // Points d'éligibilité bonus accordés à la caisse de solidarité
+  ambassadorTier?: 'bronze' | 'silver' | 'gold' | 'diamond'; // Palier d'ambassadeur Liencolis
+  maxAidAmountBoostFcfa?: number; // Majoration du plafond d'aide financière
+  // Statut Abonné Privilégié (Particuliers & Entreprises partageant le lien)
+  isPrivilegedSubscriber?: boolean;
+  privilegedBadgeLabel?: string; // ex: "Abonné Privilégié (Partenaire Partage)"
+  clientSharesCount?: number;
   createdAt: string;
 }
 
@@ -125,6 +159,9 @@ export interface Delivery {
   netDriverFee?: number; // Net amount earned by driver
   netDriverPayout?: number; // Net payout amount for driver
   isCommissionDebited?: boolean; // Flag when PIN verified
+  isPrivilegedSender?: boolean; // Si le client/entreprise a partagé le lien (Badge Abonné Privilégié)
+  privilegedSenderBadge?: string; // Libellé affiché au livreur
+  isPriorityDispatch?: boolean; // Demande prioritaire pour les livreurs
   status: DeliveryStatus;
   driverId?: string;
   driverName?: string;
@@ -231,6 +268,8 @@ export interface ClassifiedAd {
   expiresAt: string; // ISO date
   isApproved: boolean;
   isPinned?: boolean;
+  isPrivilegedSender?: boolean; // Client ou Entreprise ayant partagé le lien de parrainage
+  senderBadge?: string; // ex: "⭐ Abonné Privilégié"
   imageUrl?: string;
   price?: number;
 }
@@ -247,6 +286,8 @@ export interface AidRequest {
   proofDocumentUrl?: string;
   status: 'pending' | 'approved' | 'rejected' | 'disbursed';
   eligibilityScore: number;
+  referralCountAtRequest?: number; // Nombre de collègues parrainés au moment de la demande
+  isAmbassadorPriority?: boolean; // Coupe-file priorité ambassadeur actif
   adminNotes?: string;
   isTontineAdvance?: boolean;
   repaymentStatus?: 'none' | 'in_progress' | 'repaid';

@@ -166,7 +166,15 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   userCoords,
   className = 'w-full h-80 sm:h-96',
 }) => {
-  const safeDeliveries = Array.isArray(deliveries) ? deliveries : [];
+  const safeDeliveries = useMemo(() => {
+    if (!Array.isArray(deliveries)) return [];
+    const seen = new Set<string>();
+    return deliveries.filter((d) => {
+      if (!d || !d.id || seen.has(d.id)) return false;
+      seen.add(d.id);
+      return true;
+    });
+  }, [deliveries]);
 
   // Check for API key from env or user storage
   const [customKeyInput, setCustomKeyInput] = useState<string>('');

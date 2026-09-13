@@ -6,12 +6,14 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
   }
   body {
     font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     font-weight: 600;
     line-height: 1.55;
     letter-spacing: -0.01em;
+    overscroll-behavior-y: none;
   }
   p, span, div, a, li {
     font-weight: 600;

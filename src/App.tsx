@@ -89,9 +89,9 @@ export default function App() {
     setTriggerNewDeliveryModal((prev) => prev + 1);
   };
 
-  // Initial reset to default state as requested by user ("Amène tout l'App à par défaut")
+  // Reset to default state with NO demo account connected
   useEffect(() => {
-    const RESET_FLAG = 'liencolis_app_default_reset_executed_v2026';
+    const RESET_FLAG = 'liencolis_app_clean_reset_fresh_v2026_09';
     if (!localStorage.getItem(RESET_FLAG)) {
       localStorage.setItem(RESET_FLAG, 'true');
       storageService.resetAllToDefaults();
@@ -366,6 +366,21 @@ export default function App() {
   const handleAddMarketplaceItem = (item: MarketplaceItem) => {
     storageService.addMarketplaceItem(item);
     firestoreService.saveMarketplaceItem(item);
+    setMarketplace(storageService.getMarketplace());
+  };
+
+  const handleDeleteMarketplaceItem = (id: string) => {
+    storageService.deleteMarketplaceItem(id);
+    firestoreService.deleteMarketplaceItem(id);
+    setMarketplace(storageService.getMarketplace());
+  };
+
+  const handleToggleMarketplaceItemSold = (id: string) => {
+    storageService.toggleMarketplaceItemSold(id);
+    const updated = storageService.getMarketplace().find((i) => i.id === id);
+    if (updated) {
+      firestoreService.saveMarketplaceItem(updated);
+    }
     setMarketplace(storageService.getMarketplace());
   };
 
@@ -662,6 +677,8 @@ export default function App() {
             currentUser={currentUser}
             onAddMarketplaceItem={handleAddMarketplaceItem}
             onAddRentalItem={handleAddRentalItem}
+            onDeleteMarketplaceItem={handleDeleteMarketplaceItem}
+            onToggleMarketplaceItemSold={handleToggleMarketplaceItemSold}
             isDarkMode={isDarkMode}
             onOpenAuth={() => {
               setAuthMode('login');

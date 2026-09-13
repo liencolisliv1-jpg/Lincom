@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Delivery } from '../types';
@@ -74,7 +74,15 @@ export const MapLibreView: React.FC<MapLibreViewProps> = ({
   const [activeTileStyle, setActiveTileStyle] = useState<MapTileStyle>('osm');
   const [showLayerMenu, setShowLayerMenu] = useState(false);
 
-  const safeDeliveries = Array.isArray(deliveries) ? deliveries : [];
+  const safeDeliveries = useMemo(() => {
+    if (!Array.isArray(deliveries)) return [];
+    const seen = new Set<string>();
+    return deliveries.filter((d) => {
+      if (!d || !d.id || seen.has(d.id)) return false;
+      seen.add(d.id);
+      return true;
+    });
+  }, [deliveries]);
   const selectedDelivery = safeDeliveries.find((d) => d.id === selectedDeliveryId) || safeDeliveries[0] || null;
 
   // Initialize MapLibre GL Map

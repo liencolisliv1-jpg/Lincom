@@ -73,17 +73,35 @@ export const ClassifiedAdsBoard: React.FC<ClassifiedAdsBoardProps> = ({
     return Math.max(0, Math.floor(remainingMs / 60000));
   };
 
-  const activeAds = ads.filter((ad) => {
-    const minutesLeft = calculateMinutesRemaining(ad.expiresAt);
-    if (minutesLeft <= 0) return false;
-    if (selectedCategory !== 'all' && ad.category !== selectedCategory) return false;
-    if (selectedCity !== 'all' && ad.city !== selectedCity) return false;
-    return true;
-  });
+  const activeAds = ads
+    .filter((ad) => {
+      const minutesLeft = calculateMinutesRemaining(ad.expiresAt);
+      if (minutesLeft <= 0) return false;
+      if (selectedCategory !== 'all' && ad.category !== selectedCategory) return false;
+      if (selectedCity !== 'all' && ad.city !== selectedCity) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Prioritize Privileged Subscribers who shared the referral link
+      if (a.isPrivilegedSender && !b.isPrivilegedSender) return -1;
+      if (!a.isPrivilegedSender && b.isPrivilegedSender) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
   const handlePostAd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newDescription.trim()) return;
+
+    const isPrivileged = Boolean(
+      currentUser?.isPrivilegedSubscriber ||
+      (currentUser?.clientSharesCount && currentUser.clientSharesCount > 0)
+    );
+    const badge = isPrivileged
+      ? currentUser?.privilegedBadgeLabel ||
+        (currentUser?.role === 'merchant'
+          ? '⭐ Entreprise Privilégiée • Prise en charge Prioritaire'
+          : '⭐ Abonné Privilégié • Prise en charge Prioritaire')
+      : undefined;
 
     const now = Date.now();
     const createdAd: ClassifiedAd = {
@@ -102,6 +120,8 @@ export const ClassifiedAdsBoard: React.FC<ClassifiedAdsBoardProps> = ({
       expiresAt: new Date(now + 30 * 60000).toISOString(), // Exact 30 minutes lifetime
       isApproved: true,
       price: newPrice ? parseInt(newPrice) : undefined,
+      isPrivilegedSender: isPrivileged,
+      senderBadge: badge,
     };
 
     onAddAd(createdAd);
@@ -261,8 +281,20 @@ export const ClassifiedAdsBoard: React.FC<ClassifiedAdsBoardProps> = ({
           return (
             <div
               key={ad.id}
-              className="bg-slate-900 border border-slate-700/80 rounded-2xl p-5 shadow-xl hover:border-slate-600 transition-all flex flex-col justify-between space-y-4 relative overflow-hidden"
+              className={`rounded-2xl p-5 shadow-xl transition-all flex flex-col justify-between space-y-4 relative overflow-hidden ${
+                ad.isPrivilegedSender
+                  ? 'bg-slate-900 border-2 border-amber-400/90 shadow-amber-500/10 ring-2 ring-amber-400/30'
+                  : 'bg-slate-900 border border-slate-700/80 hover:border-slate-600'
+              }`}
             >
+              {/* Privileged ribbon if user shared referral */}
+              {ad.isPrivilegedSender && (
+                <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-400 to-yellow-500 text-slate-950 font-black text-[9px] uppercase px-3 py-0.5 rounded-bl-xl shadow flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 fill-slate-950" />
+                  <span>Priorité Abonné Privilégié</span>
+                </div>
+              )}
+
               {/* Top Row: Category & Countdown badge */}
               <div className="flex items-center justify-between">
                 <span className={`text-[11px] font-black uppercase tracking-wider ${categoryLabels[ad.category]?.color}`}>
@@ -277,6 +309,12 @@ export const ClassifiedAdsBoard: React.FC<ClassifiedAdsBoardProps> = ({
 
               {/* Title & Body */}
               <div className="space-y-2">
+                {ad.isPrivilegedSender && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black">
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    <span>{ad.senderBadge || '⭐ Abonné Privilégié • Prise en charge Prioritaire'}</span>
+                  </div>
+                )}
                 <h3 className="text-sm font-bold text-white leading-snug line-clamp-2">
                   {ad.title}
                 </h3>
@@ -401,6 +439,28 @@ export const ClassifiedAdsBoard: React.FC<ClassifiedAdsBoardProps> = ({
               </div>
               <button onClick={() => setShowPostModal(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
+
+            {/* Privileged badge status in modal */}
+            {currentUser?.isPrivilegedSubscriber || (currentUser?.clientSharesCount && currentUser.clientSharesCount > 0) ? (
+              <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center gap-2.5">
+                <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+                <div className="text-left">
+                  <span className="font-black text-amber-300 block text-xs">
+                    {currentUser?.privilegedBadgeLabel || '⭐ Abonné Privilégié Actif'}
+                  </span>
+                  <p className="text-[11px] text-slate-300 leading-tight">
+                    Votre annonce recevra le badge exclusif d'Abonné Privilégié et sera affichée en tête de liste avec priorité d'intervention livreur !
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-between gap-2 text-slate-300 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Obtenez le badge <strong>Abonné Privilégié</strong> en partageant Liencolis pour passer en priorité !</span>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handlePostAd} className="space-y-3.5 text-xs">
               <div>

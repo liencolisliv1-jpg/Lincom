@@ -59,7 +59,7 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
   const [voiceSeconds, setVoiceSeconds] = useState(0);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const voiceTimerRef = useRef<any>(null);
 
   // Load conversation messages
@@ -82,7 +82,9 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
   }, [conversation?.id, currentUser?.id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   if (!isOpen || !conversation) return null;
@@ -314,7 +316,7 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
         </div>
 
         {/* Message Feed Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
           {/* Trust Guarantee Note */}
           <div className="p-3 rounded-2xl bg-blue-950/40 border border-blue-800/40 text-blue-200 text-xs flex items-center gap-2.5">
             <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0" />
@@ -438,7 +440,6 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
               </div>
             );
           })}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Voice Recording Overlay */}

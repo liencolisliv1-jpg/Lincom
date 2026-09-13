@@ -43,6 +43,8 @@ import {
   History,
   TrendingDown,
   Info,
+  KeyRound,
+  Clock,
   Check,
   Key,
   RefreshCw,
@@ -103,6 +105,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [newPin, setNewPin] = useState('');
   const [pinChangeSuccess, setPinChangeSuccess] = useState(false);
 
+  // License Key Redemption State
+  const [showRedeemModal, setShowRedeemModal] = useState(false);
+  const [redeemKeyInput, setRedeemKeyInput] = useState('');
+  const [redeemSuccessMsg, setRedeemSuccessMsg] = useState<string | null>(null);
+  const [redeemErrorMsg, setRedeemErrorMsg] = useState<string | null>(null);
+
   if (!isOpen || !currentUser) return null;
 
   const isDriver = currentUser.role === 'driver';
@@ -133,6 +141,35 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         ? 'Formule Abonnement activée. Zéro pour cent de commission sur vos courses.'
         : 'Formule Commission activée avec prélèvement sur votre portefeuille.'
     );
+  };
+
+  const handleRedeemLicenseKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRedeemErrorMsg(null);
+    setRedeemSuccessMsg(null);
+
+    const result = storageService.redeemLicenseKey(redeemKeyInput, currentUser);
+    if (!result.success) {
+      setRedeemErrorMsg(result.message);
+      notificationService.speak("Erreur sur la clé de licence saisie.");
+      return;
+    }
+
+    if (result.updatedUser) {
+      onUpdateUser(result.updatedUser);
+    }
+
+    confetti({
+      particleCount: 60,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
+
+    setRedeemSuccessMsg(result.message);
+    notificationService.speak("Félicitations, votre licence a été activée avec succès.");
+    setTimeout(() => {
+      setRedeemKeyInput('');
+    }, 1500);
   };
 
   const simResult = calculateDeliveryCommission(simulatedCourseFee, true, currentPlan);
@@ -461,6 +498,79 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <p className="text-emerald-400 text-[10px] font-semibold">✓ 100% des gains vous reviennent directement</p>
                 </div>
               </button>
+            </div>
+
+            {/* DRIVER LICENSE & ACTIVATION KEY BOX */}
+            <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/60 to-slate-950 border border-indigo-500/40 space-y-3 shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-amber-400" />
+                  <span className="font-bold text-white text-xs">Licence d'Application & Droits d'Accès</span>
+                </div>
+                {currentUser.subscriptionExpiresAt && new Date(currentUser.subscriptionExpiresAt).getTime() > Date.now() ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    Licence Active (0% Commission)
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                    Formule Commission
+                  </span>
+                )}
+              </div>
+
+              {currentUser.subscriptionExpiresAt && (
+                <div className="flex flex-wrap items-center justify-between text-xs text-slate-300 gap-2 pt-1 border-t border-indigo-900/40">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>
+                      Expiration : <strong>{new Date(currentUser.subscriptionExpiresAt).toLocaleDateString('fr-FR')}</strong>
+                    </span>
+                  </div>
+                  {new Date(currentUser.subscriptionExpiresAt).getTime() > Date.now() && (
+                    <span className="text-[11px] font-bold text-emerald-400">
+                      {Math.ceil((new Date(currentUser.subscriptionExpiresAt).getTime() - Date.now()) / 86400000)} jours restants
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Formulaire d'activation par Clé Prépayée / Offerte */}
+              <div className="pt-2 border-t border-indigo-900/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black text-slate-300 flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-400" />
+                    <span>Activer avec une Clé de Licence</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">Format : LC-MOTO-...</span>
+                </div>
+
+                <form onSubmit={handleRedeemLicenseKey} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={redeemKeyInput}
+                    onChange={(e) => setRedeemKeyInput(e.target.value.toUpperCase())}
+                    placeholder="Ex: LC-MOTO-2026-XXXX"
+                    className="flex-1 px-3 py-1.5 bg-slate-950 border border-indigo-500/40 rounded-lg text-white font-mono text-xs font-bold focus:outline-none focus:border-amber-400 uppercase"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shrink-0 transition-all shadow cursor-pointer"
+                  >
+                    Activer
+                  </button>
+                </form>
+
+                {redeemSuccessMsg && (
+                  <p className="text-[11px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 p-2 rounded-lg">
+                    {redeemSuccessMsg}
+                  </p>
+                )}
+                {redeemErrorMsg && (
+                  <p className="text-[11px] font-bold text-rose-400 bg-rose-950/70 border border-rose-500/40 p-2 rounded-lg">
+                    {redeemErrorMsg}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* DRIVER WALLET BALANCE CARD (Solde lié au profil) */}

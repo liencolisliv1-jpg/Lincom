@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Delivery, UserProfile } from '../types';
 import { voiceService } from '../services/voiceService';
+import { calculateFairPrice } from '../utils/fairPriceCalculator';
 
 interface QuickDeliveryModalProps {
   isOpen: boolean;
@@ -72,7 +73,7 @@ const DESTINATION_COORDINATES: Record<string, { lat: number; lng: number }> = {
   'Bohicon': { lat: 7.1782, lng: 2.0667 },
 };
 
-const QUICK_PRICES = [500, 1000, 1500, 2000, 2500, 3000, 5000];
+const QUICK_PRICES = [300, 500, 1000, 1500, 2000, 2500, 3000, 5000];
 
 export const QuickDeliveryModal: React.FC<QuickDeliveryModalProps> = ({
   isOpen,
@@ -196,6 +197,19 @@ export const QuickDeliveryModal: React.FC<QuickDeliveryModalProps> = ({
     }
   };
 
+  const handleAutoCalculateFairPrice = () => {
+    const dest = dropoffAddress.trim() || 'Cadjehoun';
+    const computed = calculateFairPrice({
+      pickupLocation: 'Cotonou Centre',
+      dropoffLocation: dest,
+      vehicleType: currentUser?.vehicleType || 'moto_2wheels',
+      packageCategory: 'standard',
+      customBaseFee: 300,
+      customPerKmRate: 100,
+    });
+    setDeliveryFee(computed.recommendedPrice.toString());
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -234,6 +248,17 @@ export const QuickDeliveryModal: React.FC<QuickDeliveryModalProps> = ({
     };
 
     const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+    const isPrivileged = Boolean(
+      currentUser?.isPrivilegedSubscriber ||
+      (currentUser?.clientSharesCount && currentUser.clientSharesCount > 0)
+    );
+    const badge = isPrivileged
+      ? currentUser?.privilegedBadgeLabel ||
+        (currentUser?.role === 'merchant'
+          ? '⭐ Entreprise Privilégiée • Prioritaire'
+          : '⭐ Abonné Privilégié • Prioritaire')
+      : undefined;
+
     const newDel: Delivery = {
       id: `del_${Date.now()}`,
       trackingCode: `LC-BJ-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -260,6 +285,9 @@ export const QuickDeliveryModal: React.FC<QuickDeliveryModalProps> = ({
       securityPin: randomPin,
       isPrimaryAlertSent: false,
       isRobotVoiceTriggered: false,
+      isPrivilegedSender: isPrivileged,
+      privilegedSenderBadge: badge,
+      isPriorityDispatch: isPrivileged,
       createdAt: new Date().toISOString(),
     };
 
@@ -460,12 +488,23 @@ export const QuickDeliveryModal: React.FC<QuickDeliveryModalProps> = ({
                 <Coins className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Prix de la Course :</span>
               </label>
-              <span className="text-xs font-black text-emerald-400">
-                {parseInt(deliveryFee || '0').toLocaleString()} FCFA
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutoCalculateFairPrice}
+                  className="text-[10px] font-bold text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 px-2 py-0.5 rounded-lg border border-amber-400/30 flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Calculer selon le barème (Base 300 F + sort des km)"
+                >
+                  <Zap className="w-3 h-3 text-amber-400" />
+                  <span>Barème Base 300 F</span>
+                </button>
+                <span className="text-xs font-black text-emerald-400 font-mono">
+                  {parseInt(deliveryFee || '0').toLocaleString()} FCFA
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
               {QUICK_PRICES.map((price) => (
                 <button
                   key={price}

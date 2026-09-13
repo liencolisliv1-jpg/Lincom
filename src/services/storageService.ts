@@ -20,6 +20,9 @@ import {
   DirectConversation,
   DirectConversationMessage,
   CustomChatGroup,
+  AppLicense,
+  LicenseType,
+  LicenseStatus,
 } from '../types';
 import { SmtpConfig } from './smtpValidator';
 
@@ -39,6 +42,7 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'liencolis_transactions',
   ADMIN_SUMMARIES: 'liencolis_admin_summaries',
   PLATFORM_WITHDRAWALS: 'liencolis_platform_withdrawals',
+  LICENSES: 'liencolis_app_licenses',
   ADMIN_PIN: 'liencolis_admin_pin',
   ADMIN_PASSWORD: 'liencolis_admin_password',
   SMTP_CONFIG: 'liencolis_smtp_config',
@@ -957,6 +961,12 @@ class StorageService {
     }
   }
 
+  public saveAllUsers(users: UserProfile[]): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(users));
+    } catch {}
+  }
+
   public setUser(user: UserProfile): void {
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
     try {
@@ -1223,7 +1233,17 @@ class StorageService {
       const data = localStorage.getItem(STORAGE_KEYS.DELIVERIES);
       if (data) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const seen = new Set<string>();
+          const deduped: Delivery[] = [];
+          for (const item of parsed) {
+            if (item && item.id && !seen.has(item.id)) {
+              seen.add(item.id);
+              deduped.push(item);
+            }
+          }
+          if (deduped.length > 0) return deduped;
+        }
       }
     } catch {}
     this.saveDeliveries(DEFAULT_DELIVERIES);
@@ -1231,12 +1251,25 @@ class StorageService {
   }
 
   public saveDeliveries(deliveries: Delivery[]): void {
-    localStorage.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(deliveries));
+    const seen = new Set<string>();
+    const deduped: Delivery[] = [];
+    for (const item of deliveries) {
+      if (item && item.id && !seen.has(item.id)) {
+        seen.add(item.id);
+        deduped.push(item);
+      }
+    }
+    localStorage.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(deduped));
   }
 
   public addDelivery(delivery: Delivery): void {
     const list = this.getDeliveries();
-    list.unshift(delivery);
+    const existingIdx = list.findIndex((d) => d.id === delivery.id);
+    if (existingIdx >= 0) {
+      list[existingIdx] = delivery;
+    } else {
+      list.unshift(delivery);
+    }
     this.saveDeliveries(list);
   }
 
@@ -1367,6 +1400,13 @@ class StorageService {
 
   public deleteMarketplaceItem(id: string): void {
     const list = this.getMarketplace().filter((item) => item.id !== id);
+    this.saveMarketplace(list);
+  }
+
+  public toggleMarketplaceItemSold(id: string): void {
+    const list = this.getMarketplace().map((item) =>
+      item.id === id ? { ...item, isSold: !item.isSold } : item
+    );
     this.saveMarketplace(list);
   }
 
@@ -2057,6 +2097,339 @@ class StorageService {
     localStorage.setItem('liencolis_midnight_dispatch_logs', JSON.stringify([newEntry, ...existing.slice(0, 49)]));
   }
 
+  public getLicenses(): AppLicense[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.LICENSES);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+
+    const defaultLicenses: AppLicense[] = [
+      {
+        id: 'lic_seed_01',
+        licenseKey: 'LC-MOTO-2026-8891',
+        licenseType: 'subscription_2wheels',
+        title: 'Licence Pro Moto 2 Roues (0% Commission)',
+        targetUserId: 'usr_driver_01',
+        targetUserName: 'Utilisateur Demo',
+        targetUserPhone: '+229 00 00 00 00',
+        driverVehicleType: 'moto_2wheels',
+        durationDays: 30,
+        priceFcfa: 1200,
+        status: 'active',
+        issuedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+        activatedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+        expiresAt: new Date(Date.now() + 25 * 86400000).toISOString(),
+        grantedBy: 'system',
+        features: ['0% commission sur toutes les courses', 'Alertes GPS prioritaires 300m', 'Support WhatsApp VIP 24/7', 'Badge Certifié'],
+        maxDeliveriesPerMonth: -1,
+        notes: 'Licence mensuelle initiale avec formule abonnement illimitée',
+      },
+      {
+        id: 'lic_seed_02',
+        licenseKey: 'LC-VIP-2026-9410',
+        licenseType: 'vip_badge',
+        title: 'Badge VIP Driver Or (Visibilité Prioritaire)',
+        targetUserId: 'usr_driver_01',
+        targetUserName: 'Utilisateur Demo',
+        targetUserPhone: '+229 00 00 00 00',
+        durationDays: 7,
+        priceFcfa: 300,
+        status: 'active',
+        issuedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+        activatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+        expiresAt: new Date(Date.now() + 6 * 86400000).toISOString(),
+        grantedBy: 'admin_manual',
+        features: ['Badge doré dans les annonces', 'Position en tête de liste', 'Accès prioritaire aux courses urgentes'],
+        maxDeliveriesPerMonth: -1,
+        notes: 'Badge VIP hebdomadaire certifié',
+      },
+      {
+        id: 'lic_seed_03',
+        licenseKey: 'LC-TRI-2026-5520',
+        licenseType: 'subscription_tricycle',
+        title: 'Licence Cargo Tricycle (0% Commission)',
+        durationDays: 30,
+        priceFcfa: 1500,
+        status: 'pending',
+        issuedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+        grantedBy: 'voucher_card',
+        features: ['0% commission charges lourdes & tricycles', 'Courses gros volumes', 'Assurance assistance route'],
+        maxDeliveriesPerMonth: -1,
+        notes: 'Clé prépayée disponible pour activation immédiate',
+      },
+    ];
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.LICENSES, JSON.stringify(defaultLicenses));
+    } catch {}
+    return defaultLicenses;
+  }
+
+  public saveLicenses(licenses: AppLicense[]): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.LICENSES, JSON.stringify(licenses));
+    } catch (e) {
+      console.warn('[StorageService] Error saving licenses:', e);
+    }
+  }
+
+  public addLicense(license: AppLicense): void {
+    const list = this.getLicenses();
+    list.unshift(license);
+    this.saveLicenses(list);
+  }
+
+  public updateLicense(license: AppLicense): void {
+    const list = this.getLicenses();
+    const idx = list.findIndex((l) => l.id === license.id);
+    if (idx >= 0) {
+      list[idx] = license;
+      this.saveLicenses(list);
+    }
+  }
+
+  public deleteLicense(id: string): void {
+    const list = this.getLicenses().filter((l) => l.id !== id);
+    this.saveLicenses(list);
+  }
+
+  public generateLicenseKey(type: LicenseType, prefix: string = 'LC'): string {
+    const year = new Date().getFullYear();
+    const typeCode =
+      type === 'subscription_2wheels'
+        ? 'MOTO'
+        : type === 'subscription_tricycle'
+        ? 'TRI'
+        : type === 'subscription_4wheels'
+        ? 'CAR4'
+        : type === 'vip_badge'
+        ? 'VIP'
+        : type === 'fleet_enterprise'
+        ? 'FLOTTE'
+        : 'PRO';
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${typeCode}-${year}-${rand}`;
+  }
+
+  public createLicense(options: {
+    type: LicenseType;
+    durationDays: number;
+    targetUserId?: string;
+    targetUserName?: string;
+    targetUserPhone?: string;
+    driverVehicleType?: any;
+    notes?: string;
+    priceFcfa?: number;
+    grantedBy?: 'admin_manual' | 'fedapay' | 'kkiapay' | 'system' | 'voucher_card';
+  }): AppLicense {
+    const defaultPrices: Record<LicenseType, number> = {
+      subscription_2wheels: 1200,
+      subscription_tricycle: 1500,
+      subscription_4wheels: 2000,
+      vip_badge: 300,
+      fleet_enterprise: 5000,
+      custom: 1000,
+    };
+
+    const defaultTitles: Record<LicenseType, string> = {
+      subscription_2wheels: 'Licence Pro Moto 2 Roues (0% Commission)',
+      subscription_tricycle: 'Licence Cargo Tricycle (0% Commission)',
+      subscription_4wheels: 'Licence Interurbaine 4 Roues (0% Commission)',
+      vip_badge: 'Badge VIP Driver Or (Visibilité Maximale)',
+      fleet_enterprise: 'Licence Flotte Entreprise Multi-Conducteurs',
+      custom: 'Licence Personnalisée LienColis Driver',
+    };
+
+    const newLic: AppLicense = {
+      id: 'lic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      licenseKey: this.generateLicenseKey(options.type),
+      licenseType: options.type,
+      title: defaultTitles[options.type] || 'Licence LienColis Driver',
+      targetUserId: options.targetUserId,
+      targetUserName: options.targetUserName,
+      targetUserPhone: options.targetUserPhone,
+      driverVehicleType: options.driverVehicleType,
+      durationDays: options.durationDays,
+      priceFcfa: options.priceFcfa ?? defaultPrices[options.type] ?? 1200,
+      status: options.targetUserId ? 'active' : 'pending',
+      issuedAt: new Date().toISOString(),
+      activatedAt: options.targetUserId ? new Date().toISOString() : undefined,
+      expiresAt: new Date(Date.now() + options.durationDays * 86400000).toISOString(),
+      grantedBy: options.grantedBy || 'admin_manual',
+      features:
+        options.type === 'vip_badge'
+          ? ['Badge doré certifié', 'Positionnement en haut de liste', 'Alertes VIP instantanées']
+          : ['0% de commission sur toutes les courses', 'Alertes GPS prioritaires 300m', 'Support WhatsApp VIP 24/7'],
+      maxDeliveriesPerMonth: -1,
+      notes: options.notes || 'Licence délivrée par le panneau Super-Administrateur',
+    };
+
+    this.addLicense(newLic);
+
+    // If assigned to a user, update their profile
+    if (options.targetUserId) {
+      const allUsers = this.getAllUsers();
+      const user = allUsers.find((u) => u.id === options.targetUserId);
+      if (user) {
+        if (options.type === 'vip_badge') {
+          user.premiumBadgeUntil = newLic.expiresAt;
+        } else {
+          user.pricingPlan = 'subscription';
+          user.subscriptionExpiresAt = newLic.expiresAt;
+        }
+        this.setUser(user);
+      }
+    }
+
+    return newLic;
+  }
+
+  public redeemLicenseKey(
+    keyInput: string,
+    currentUser: UserProfile
+  ): { success: boolean; message: string; updatedUser?: UserProfile; license?: AppLicense } {
+    const cleanKey = keyInput.trim().toUpperCase();
+    if (!cleanKey) {
+      return { success: false, message: 'Veuillez saisir une clé de licence valide.' };
+    }
+
+    const licenses = this.getLicenses();
+    const license = licenses.find((l) => l.licenseKey.toUpperCase() === cleanKey);
+
+    if (!license) {
+      return {
+        success: false,
+        message: `Clé de licence "${cleanKey}" introuvable. Veuillez vérifier le code ou contacter l'administration.`,
+      };
+    }
+
+    if (license.status === 'suspended') {
+      return { success: false, message: 'Cette licence a été suspendue par l’administration.' };
+    }
+
+    if (license.status === 'active' && license.targetUserId && license.targetUserId !== currentUser.id) {
+      return {
+        success: false,
+        message: 'Cette clé de licence a déjà été activée par un autre compte chauffeur.',
+      };
+    }
+
+    const now = Date.now();
+    const durationMs = (license.durationDays || 30) * 86400000;
+    const newExpiresAt = new Date(now + durationMs).toISOString();
+
+    // Update license record
+    license.status = 'active';
+    license.targetUserId = currentUser.id;
+    license.targetUserName = currentUser.name;
+    license.targetUserPhone = currentUser.phone;
+    license.activatedAt = new Date().toISOString();
+    license.expiresAt = newExpiresAt;
+    this.updateLicense(license);
+
+    // Update user
+    const updatedUser: UserProfile = { ...currentUser };
+    if (license.licenseType === 'vip_badge') {
+      const currentExpiry = currentUser.premiumBadgeUntil ? new Date(currentUser.premiumBadgeUntil).getTime() : now;
+      const baseTime = currentExpiry > now ? currentExpiry : now;
+      updatedUser.premiumBadgeUntil = new Date(baseTime + durationMs).toISOString();
+    } else {
+      const currentSub = currentUser.subscriptionExpiresAt ? new Date(currentUser.subscriptionExpiresAt).getTime() : now;
+      const baseSubTime = currentSub > now ? currentSub : now;
+      updatedUser.pricingPlan = 'subscription';
+      updatedUser.subscriptionExpiresAt = new Date(baseSubTime + durationMs).toISOString();
+    }
+
+    this.setUser(updatedUser);
+
+    return {
+      success: true,
+      message: `🎉 Licence "${license.title}" activée avec succès jusqu'au ${new Date(newExpiresAt).toLocaleDateString('fr-FR')} ! Formule 0% commission active.`,
+      updatedUser,
+      license,
+    };
+  }
+
+  public grantOrExtendDriverLicense(
+    userId: string,
+    days: number,
+    licenseType: LicenseType = 'subscription_2wheels',
+    notes?: string
+  ): { success: boolean; message: string; updatedUser?: UserProfile; license?: AppLicense } {
+    const allUsers = this.getAllUsers();
+    const user = allUsers.find((u) => u.id === userId);
+    if (!user) {
+      return { success: false, message: `Utilisateur avec l'identifiant ${userId} introuvable.` };
+    }
+
+    const now = Date.now();
+    const durationMs = days * 86400000;
+
+    let targetExpiresAt: string;
+    if (licenseType === 'vip_badge') {
+      const current = user.premiumBadgeUntil ? new Date(user.premiumBadgeUntil).getTime() : now;
+      const base = current > now ? current : now;
+      targetExpiresAt = new Date(base + durationMs).toISOString();
+      user.premiumBadgeUntil = targetExpiresAt;
+    } else {
+      const current = user.subscriptionExpiresAt ? new Date(user.subscriptionExpiresAt).getTime() : now;
+      const base = current > now ? current : now;
+      targetExpiresAt = new Date(base + durationMs).toISOString();
+      user.pricingPlan = 'subscription';
+      user.subscriptionExpiresAt = targetExpiresAt;
+    }
+
+    this.setUser(user);
+
+    // Create / Record new license
+    const newLic = this.createLicense({
+      type: licenseType,
+      durationDays: days,
+      targetUserId: user.id,
+      targetUserName: user.name,
+      targetUserPhone: user.phone,
+      driverVehicleType: user.vehicleType,
+      notes: notes || `Extension manuelle de ${days} jours accordée par l'administrateur`,
+      grantedBy: 'admin_manual',
+    });
+
+    return {
+      success: true,
+      message: `Licence ${newLic.title} octroyée/prolongée de ${days} jours pour ${user.name} (Valide jusqu'au ${new Date(targetExpiresAt).toLocaleDateString('fr-FR')}).`,
+      updatedUser: user,
+      license: newLic,
+    };
+  }
+
+  public revokeDriverLicense(userId: string): { success: boolean; message: string; updatedUser?: UserProfile } {
+    const allUsers = this.getAllUsers();
+    const user = allUsers.find((u) => u.id === userId);
+    if (!user) {
+      return { success: false, message: 'Utilisateur introuvable.' };
+    }
+
+    user.pricingPlan = 'commission';
+    user.subscriptionExpiresAt = new Date().toISOString();
+    user.premiumBadgeUntil = new Date().toISOString();
+    this.setUser(user);
+
+    // Mark active licenses for this user as suspended
+    const licenses = this.getLicenses();
+    licenses.forEach((l) => {
+      if (l.targetUserId === userId && l.status === 'active') {
+        l.status = 'suspended';
+      }
+    });
+    this.saveLicenses(licenses);
+
+    return {
+      success: true,
+      message: `La licence de ${user.name} a été révoquée. Le compte est repassé en Formule Commission par défaut.`,
+      updatedUser: user,
+    };
+  }
+
   public resetAllToDefaults(): void {
     try {
       localStorage.setItem(STORAGE_KEYS.DELIVERIES, JSON.stringify(DEFAULT_DELIVERIES));
@@ -2066,6 +2439,7 @@ class StorageService {
       localStorage.setItem(STORAGE_KEYS.RENTALS, JSON.stringify(DEFAULT_RENTALS));
       localStorage.setItem(STORAGE_KEYS.AID_REQUESTS, JSON.stringify(DEFAULT_AID_REQUESTS));
       localStorage.setItem(STORAGE_KEYS.TONTINE_CYCLES, JSON.stringify(DEFAULT_TONTINE_CYCLES));
+      localStorage.removeItem(STORAGE_KEYS.LICENSES);
       localStorage.removeItem(STORAGE_KEYS.USER);
       localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
       localStorage.removeItem(STORAGE_KEYS.ADMIN_SUMMARIES);

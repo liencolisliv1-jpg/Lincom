@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DailyAdministrativeSummary, Delivery, UserProfile, PaymentProvider, AidRequest } from '../types';
 import { AdminAuthPanel } from './AdminAuthPanel';
 import { SmtpBackofficePanel } from './SmtpBackofficePanel';
+import { AdminLicenseManagement } from './AdminLicenseManagement';
 import { auth, onAuthStateChanged } from '../services/firebase';
 import { firestoreService } from '../services/firestoreService';
 import { storageService } from '../services/storageService';
@@ -79,7 +80,7 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
   onUpdateAidRequest,
   isDarkMode,
 }) => {
-  const [activeTab, setActiveTab] = useState<'admin_panel' | 'aid_validation' | 'commissions_treasury' | 'firestore_database' | 'smtp_settings' | 'launch_checklist'>('admin_panel');
+  const [activeTab, setActiveTab] = useState<'admin_panel' | 'licenses_management' | 'aid_validation' | 'commissions_treasury' | 'firestore_database' | 'smtp_settings' | 'launch_checklist'>('admin_panel');
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [firebaseAdminUser, setFirebaseAdminUser] = useState<any>(null);
   const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
@@ -929,6 +930,15 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
               Supervision & Docs
             </button>
             <button
+              onClick={() => setActiveTab('licenses_management')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === 'licenses_management' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+              <span>Licences & Abonnements</span>
+            </button>
+            <button
               onClick={() => setActiveTab('aid_validation')}
               className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
                 activeTab === 'aid_validation' ? 'bg-rose-600 text-white font-black shadow' : 'text-slate-400 hover:text-white'
@@ -998,7 +1008,14 @@ export const AdminSupportDashboard: React.FC<AdminSupportDashboardProps> = ({
         </div>
       )}
 
-      {activeTab === 'aid_validation' ? (
+      {activeTab === 'licenses_management' ? (
+        /* TAB: ADVANCED LICENSES & SUBSCRIPTIONS MANAGEMENT */
+        <AdminLicenseManagement
+          currentUser={currentUser}
+          allUsers={storageService.getAllUsers()}
+          isDarkMode={isDarkMode}
+        />
+      ) : activeTab === 'aid_validation' ? (
         /* TAB: EXCLUSIVE AID REQUESTS VALIDATION & PAYOUTS */
         <div className="space-y-4">
           {/* Header Banner */}
