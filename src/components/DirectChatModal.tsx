@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import {
   DirectConversation,
   DirectConversationMessage,
   UserProfile,
   MarketplaceItem,
   RentalItem,
+  MessageReplyInfo,
 } from '../types';
 import { storageService } from '../services/storageService';
 import { firestoreService } from '../services/firestoreService';
@@ -31,6 +33,10 @@ import {
   Tag,
   Bike,
   ShoppingBag,
+  Trash2,
+  Edit2,
+  Check,
+  Reply,
 } from 'lucide-react';
 
 interface DirectChatModalProps {
@@ -50,6 +56,10 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
 }) => {
   const [messages, setMessages] = useState<DirectConversationMessage[]>([]);
   const [inputText, setInputText] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editMessageText, setEditMessageText] = useState<string>('');
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<MessageReplyInfo | null>(null);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [showRentalBookingModal, setShowRentalBookingModal] = useState(false);
   const [customOfferAmount, setCustomOfferAmount] = useState<string>('');
@@ -108,21 +118,35 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
       return;
     }
 
+    const replyPayload = replyingToMessage ? { replyTo: replyingToMessage } : {};
+
     const newMsg: DirectConversationMessage = {
       id: `cmsg_${Date.now()}`,
       conversationId: conversation.id,
       senderId: currentUser.id,
       senderName: currentUser.name || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'Utilisateur',
       senderRole: currentUser.role,
-      senderAvatar: currentUser.avatarUrl,
+      ...(currentUser.avatarUrl ? { senderAvatar: currentUser.avatarUrl } : {}),
       content: content || '',
       timestamp: new Date().toISOString(),
+      ...replyPayload,
       ...customPayload,
     };
 
     storageService.addConversationMessage(conversation.id, newMsg);
     setMessages((prev) => [...prev, newMsg]);
     setInputText('');
+    setReplyingToMessage(null);
+  };
+
+  const handleTriggerReply = (msg: DirectConversationMessage) => {
+    const snippet = msg.content || (msg.imageUrl ? '📷 Photo' : msg.audioUrl ? '🎤 Message vocal' : msg.offerAmount ? `💰 Offre : ${msg.offerAmount.toLocaleString()} F` : 'Message');
+    setReplyingToMessage({
+      id: msg.id,
+      messageId: msg.id,
+      senderName: msg.senderName,
+      text: snippet,
+    });
   };
 
   const handleSendOffer = (e: React.FormEvent) => {
@@ -197,6 +221,35 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
       imageUrl: photoDataUrl,
     });
     setShowCameraModal(false);
+  };
+
+  const handleStartEdit = (msg: DirectConversationMessage) => {
+    setEditingMessageId(msg.id);
+    setEditMessageText(msg.content || '');
+    setDeletingMessageId(null);
+  };
+
+  const handleSaveEdit = (msgId: string) => {
+    const trimmed = editMessageText.trim();
+    if (!trimmed || !conversation) return;
+
+    storageService.updateConversationMessage(conversation.id, msgId, trimmed);
+    const updated = messages.map((m) => (m.id === msgId ? { ...m, content: trimmed, isEdited: true, editedAt: new Date().toISOString() } : m));
+    setMessages(updated);
+    setEditingMessageId(null);
+    setEditMessageText('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditMessageText('');
+  };
+
+  const handleConfirmDelete = (msgId: string) => {
+    if (!conversation) return;
+    storageService.deleteConversationMessage(conversation.id, msgId);
+    setMessages(messages.filter((m) => m.id !== msgId));
+    setDeletingMessageId(null);
   };
 
   const quickPrompts = isMarketplace
@@ -333,19 +386,158 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
                 key={msg.id}
                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}
               >
-                <div className="flex items-center gap-1 text-[10px] text-slate-400 px-1">
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 px-1">
                   <span className="font-bold text-slate-300">{msg.senderName}</span>
                   <span>•</span>
                   <span>{new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  {msg.isEdited && (
+                    <span className="text-amber-400 font-medium italic text-[9px] bg-amber-400/10 px-1 rounded border border-amber-400/20">
+                      (modifié)
+                    </span>
+                  )}
+
+                  {/* Reply Button */}
+                  {editingMessageId !== msg.id && deletingMessageId !== msg.id && (
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerReply(msg)}
+                      className="p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-300 transition-colors flex items-center gap-0.5 opacity-75 hover:opacity-100"
+                      title="Glisser vers la droite ou cliquer pour répondre"
+                    >
+                      <Reply className="w-2.5 h-2.5 text-amber-400" />
+                      <span className="text-[9px] hidden sm:inline">Répondre</span>
+                    </button>
+                  )}
+
+                  {isMe && editingMessageId !== msg.id && deletingMessageId !== msg.id && (
+                    <div className="flex items-center gap-1 ml-1 opacity-70 hover:opacity-100 transition-opacity">
+                      {!msg.isVoiceNote && !msg.offerAmount && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(msg)}
+                          className="p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-sky-300 transition-colors"
+                          title="Modifier le message"
+                        >
+                          <Edit2 className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDeletingMessageId(msg.id)}
+                        className="p-0.5 rounded hover:bg-red-950 text-slate-400 hover:text-red-400 transition-colors"
+                        title="Supprimer ce message"
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <div
-                  className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-3 text-xs leading-relaxed space-y-2 shadow-md ${
-                    isMe
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-none'
-                      : 'bg-slate-800 border border-slate-700 text-slate-100 rounded-tl-none'
-                  }`}
-                >
+                {/* Delete Confirmation Box */}
+                {deletingMessageId === msg.id && (
+                  <div className="w-full max-w-xs p-2.5 rounded-xl bg-red-950/95 border border-red-500/70 shadow-lg text-xs space-y-2 animate-in fade-in">
+                    <p className="font-bold text-red-100 text-[11px] flex items-center gap-1">
+                      <Trash2 className="w-3 h-3 text-red-400" />
+                      <span>Supprimer ce message ?</span>
+                    </p>
+                    <div className="flex items-center justify-end gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setDeletingMessageId(null)}
+                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmDelete(msg.id)}
+                        className="px-2.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold shadow"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Inline Editing */}
+                {editingMessageId === msg.id ? (
+                  <div className="w-full max-w-sm rounded-xl p-2.5 bg-slate-900 border-2 border-sky-500 shadow-xl space-y-2 animate-in fade-in">
+                    <div className="flex items-center justify-between text-[10px] text-sky-400 font-bold">
+                      <span className="flex items-center gap-1">
+                        <Edit2 className="w-3 h-3" /> Modifier le message
+                      </span>
+                    </div>
+                    <textarea
+                      value={editMessageText}
+                      onChange={(e) => setEditMessageText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSaveEdit(msg.id);
+                        } else if (e.key === 'Escape') {
+                          handleCancelEdit();
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-400 resize-none min-h-[60px]"
+                      autoFocus
+                    />
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveEdit(msg.id)}
+                        disabled={!editMessageText.trim()}
+                        className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-[11px] font-bold flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3" />
+                        <span>Enregistrer</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                <div className="relative group max-w-[85%] sm:max-w-[75%]">
+                  {/* Swipe reply behind icon */}
+                  <div className="absolute inset-y-0 left-0 w-10 flex items-center justify-start pl-1 pointer-events-none text-amber-400">
+                    <div className="w-6 h-6 rounded-full bg-amber-400/20 border border-amber-400/50 flex items-center justify-center scale-90 shadow">
+                      <Reply className="w-3 h-3 text-amber-300" />
+                    </div>
+                  </div>
+
+                  {/* Swipeable Bubble */}
+                  <motion.div
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 60 }}
+                    dragElastic={0.2}
+                    dragSnapToOrigin
+                    onDragEnd={(_, info) => {
+                      if (info.offset.x > 35 || info.velocity.x > 120) {
+                        handleTriggerReply(msg);
+                      }
+                    }}
+                    className={`rounded-2xl p-3 text-xs leading-relaxed space-y-2 shadow-md cursor-grab active:cursor-grabbing ${
+                      isMe
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-none'
+                        : 'bg-slate-800 border border-slate-700 text-slate-100 rounded-tl-none'
+                    }`}
+                  >
+                    {/* Quoted Message */}
+                    {msg.replyTo && (
+                      <div className="p-2 rounded-xl bg-black/35 border-l-4 border-amber-400 text-left text-xs text-slate-200">
+                        <div className="flex items-center gap-1 font-bold text-amber-300 text-[10px]">
+                          <Reply className="w-2.5 h-2.5 text-amber-400 rotate-180 scale-y-[-1]" />
+                          <span>{msg.replyTo.senderName}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-300/90 truncate mt-0.5 line-clamp-2">
+                          {msg.replyTo.text}
+                        </p>
+                      </div>
+                    )}
                   {/* Image attachment if any */}
                   {msg.imageUrl && (
                     <div className="rounded-xl overflow-hidden border border-white/10 max-h-48 bg-black/40">
@@ -436,7 +628,9 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
                       )}
                     </div>
                   )}
+                  </motion.div>
                 </div>
+                )}
               </div>
             );
           })}
@@ -463,6 +657,34 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
                 Envoyer
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Replying To Quote Banner */}
+        {replyingToMessage && (
+          <div className="p-2.5 px-3 bg-slate-900/95 border-t-2 border-amber-400 flex items-center justify-between gap-3 shadow-lg animate-in slide-in-from-bottom-2 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-amber-400/20 border border-amber-400/40 flex items-center justify-center shrink-0">
+                <Reply className="w-3.5 h-3.5 text-amber-300" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <span>Réponse à</span>
+                  <span className="text-white font-semibold">{replyingToMessage.senderName}</span>
+                </p>
+                <p className="text-[11px] text-slate-300/80 truncate max-w-xs sm:max-w-md mt-0.5">
+                  {replyingToMessage.text}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyingToMessage(null)}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white shrink-0 transition-colors"
+              title="Annuler la réponse"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 

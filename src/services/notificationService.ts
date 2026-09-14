@@ -618,6 +618,18 @@ class NotificationService {
       title = `🚴 Colis #${tracking} En Route`;
       body = `Un utilisateur a pris en charge le colis. La course est actuellement en chemin vers ${delivery.dropoffCity}.`;
       this.speak(`Course ${tracking} en route vers la destination.`);
+    } else if (delivery.status === 'nearby_500m') {
+      title = `⚠️ Colis #${tracking} à 500m du client`;
+      body = `Le livreur est à moins de 500 mètres du point de livraison (${delivery.dropoffAddress}). Notification de proximité transmise au client.`;
+      this.speak(`Alerte 500 mètres. Course ${tracking} proche de destination.`);
+    } else if (delivery.status === 'alert_300m') {
+      title = `🚨 Colis #${tracking} : Appel Automatique 300m Déclenché`;
+      body = `Distance 300 mètres atteinte. Appel direct mains-libres déclenché vers le client (${delivery.clientPhone || 'contact client'}).`;
+      this.speak(`Alerte 300 mètres. Appel automatique vers le client déclenché.`);
+    } else if (delivery.status === 'arrived') {
+      title = `📍 Livreur Arrivé sur Place - #${tracking}`;
+      body = `Le livreur est arrivé à destination (${delivery.dropoffAddress}). Présentez le code PIN #${delivery.securityPin || '---'}.`;
+      this.speak(`Livreur arrivé sur place. Préparez le code PIN.`);
     } else if (delivery.status === 'delivered') {
       title = `✅ Colis #${tracking} Livré`;
       body = `Un utilisateur a validé la réception du colis avec succès.`;
@@ -625,12 +637,44 @@ class NotificationService {
     }
 
     this.sendPushNotification({
-      type: 'urgent_delivery',
+      type: delivery.status === 'alert_300m' ? 'auto_call_300m' : delivery.status === 'nearby_500m' ? 'proximity_500m' : 'urgent_delivery',
       title,
       body,
       city: delivery.dropoffCity,
       targetTab: 'deliveries',
       actionLabel: 'Suivre la course',
+    });
+  }
+
+  /**
+   * Dedicated notification when delivery reaches 500m proximity
+   */
+  public notifyProximity500m(delivery: Delivery): void {
+    const tracking = delivery.trackingCode || delivery.id.slice(0, 6);
+    this.playDriverCirculationAlert(`Attention conducteur, alerte 500 mètres : message de proximité transmis au client.`);
+    this.sendPushNotification({
+      type: 'proximity_500m',
+      title: `⚠️ Alerte 500m : Colis #${tracking}`,
+      body: `Le livreur approche à moins de 500 mètres de ${delivery.dropoffAddress} (${delivery.dropoffCity}). Le client ${delivery.clientPseudo || 'destinataire'} a été prévenu pour se préparer.`,
+      city: delivery.dropoffCity,
+      targetTab: 'deliveries',
+      actionLabel: 'Voir la livraison',
+    });
+  }
+
+  /**
+   * Dedicated notification when delivery triggers automatic call at 300m
+   */
+  public notifyAutoCall300m(delivery: Delivery): void {
+    const tracking = delivery.trackingCode || delivery.id.slice(0, 6);
+    this.playDriverCirculationAlert(`Alerte 300 mètres ! Déclenchement automatique de l'appel sécurisé vers le client.`);
+    this.sendPushNotification({
+      type: 'auto_call_300m',
+      title: `🚨 Alerte 300m : Appel Automatique Déclenché (#${tracking})`,
+      body: `Distance 300 mètres atteinte ! Déclenchement automatique de l'appel direct sans contact vers ${delivery.clientPseudo || 'le client'} (${delivery.clientPhone}). Gardez les mains sur le guidon.`,
+      city: delivery.dropoffCity,
+      targetTab: 'deliveries',
+      actionLabel: 'Écran d\'Appel',
     });
   }
 }

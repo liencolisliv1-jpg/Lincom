@@ -19,6 +19,10 @@ export function getFriendlyAuthErrorMessage(errorCodeOrMsg: string, providerType
   const code = errorCodeOrMsg.toLowerCase();
   const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'ce domaine';
 
+  if (code.includes('missing-initial-state') || code.includes('état initial manquant') || code.includes('session storage') || code.includes('storage-partitioned') || code.includes('web-storage-unsupported')) {
+    return "Stockage de session restreint ou partitionné par le navigateur (iFrame / cookies tiers) : L'environnement empêche l'échange du jeton Google dans cette fenêtre intégrée. Vous pouvez : 1) Ouvrir l'application dans un nouvel onglet, ou 2) Vous connecter simplement avec votre adresse Email et Mot de passe.";
+  }
+
   if (code.includes('operation-not-allowed')) {
     if (providerType === 'google' || code.includes('google')) {
       return "Fournisseur Google désactivé sur Firebase : Rendez-vous sur la console Firebase (console.firebase.google.com/project/lincom-1ecc6/authentication/providers) > 'Mode de connexion' (Sign-in method) > activez 'Google' puis enregistrez.";

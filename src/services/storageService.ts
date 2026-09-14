@@ -1327,6 +1327,23 @@ class StorageService {
     this.saveMessages(all);
   }
 
+  public updateMessage(messageId: string, newContent: string): void {
+    const all = this.getMessages();
+    const idx = all.findIndex((m) => m.id === messageId);
+    if (idx >= 0) {
+      all[idx].content = newContent;
+      all[idx].isEdited = true;
+      all[idx].editedAt = new Date().toISOString();
+      this.saveMessages(all);
+    }
+  }
+
+  public deleteMessage(messageId: string): void {
+    const all = this.getMessages();
+    const filtered = all.filter((m) => m.id !== messageId);
+    this.saveMessages(filtered);
+  }
+
   public getAds(): ClassifiedAd[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ADS);
@@ -1536,6 +1553,41 @@ class StorageService {
     if (idx >= 0) {
       all[idx].lastMessageText = message.content || (message.imageUrl ? '📷 Photo partagée' : message.isVoiceNote ? '🎙️ Message vocal' : 'Nouveau message');
       all[idx].lastMessageTimestamp = message.timestamp;
+      this.saveConversations(all);
+    }
+  }
+
+  public updateConversationMessage(conversationId: string, messageId: string, newContent: string): void {
+    const msgs = this.getConversationMessages(conversationId);
+    const target = msgs.find((m) => m.id === messageId);
+    if (target) {
+      target.content = newContent;
+      target.isEdited = true;
+      target.editedAt = new Date().toISOString();
+      this.saveConversationMessages(conversationId, msgs);
+
+      // Update conversation metadata if it was the latest
+      const all = this.getConversations();
+      const idx = all.findIndex((c) => c.id === conversationId);
+      if (idx >= 0 && msgs[msgs.length - 1].id === messageId) {
+        all[idx].lastMessageText = newContent;
+        this.saveConversations(all);
+      }
+    }
+  }
+
+  public deleteConversationMessage(conversationId: string, messageId: string): void {
+    const msgs = this.getConversationMessages(conversationId);
+    const filtered = msgs.filter((m) => m.id !== messageId);
+    this.saveConversationMessages(conversationId, filtered);
+
+    // Update conversation metadata with new last message
+    const all = this.getConversations();
+    const idx = all.findIndex((c) => c.id === conversationId);
+    if (idx >= 0) {
+      const lastMsg = filtered[filtered.length - 1];
+      all[idx].lastMessageText = lastMsg ? (lastMsg.content || (lastMsg.imageUrl ? '📷 Photo partagée' : 'Message')) : 'Aucun message';
+      all[idx].lastMessageTimestamp = lastMsg ? lastMsg.timestamp : all[idx].createdAt;
       this.saveConversations(all);
     }
   }

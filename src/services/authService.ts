@@ -37,6 +37,13 @@ export function getFriendlyAuthErrorMessage(error: any): { message: string; code
   const rawCode = error?.code || (typeof error?.message === 'string' && error.message.includes('(') ? error.message.match(/\(([^)]+)\)/)?.[1] : '') || '';
   const code = rawCode.toLowerCase();
 
+  if (code.includes('missing-initial-state') || code.includes('état initial manquant') || code.includes('session storage') || code.includes('storage-partitioned') || code.includes('web-storage-unsupported')) {
+    return {
+      code: 'auth/missing-initial-state',
+      message: "Stockage de session restreint par le navigateur (iFrame ou cookies tiers bloqués). Ouvrez l'application dans un nouvel onglet ou utilisez la connexion avec Email et Mot de passe.",
+    };
+  }
+
   if (code.includes('email-already-in-use')) {
     return {
       code: 'auth/email-already-in-use',

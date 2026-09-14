@@ -205,6 +205,57 @@ class VoiceService {
   }
 
   /**
+   * Plays a realistic telephone ring tone (standard phone tone)
+   */
+  public playPhoneRingBeep(): void {
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(425, now);
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.05);
+      gain.gain.setValueAtTime(0.18, now + 0.95);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 1.05);
+    } catch {}
+  }
+
+  /**
+   * Plays a call connected chime
+   */
+  public playCallConnectedTone(): void {
+    try {
+      const ctx = this.getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, now); // D5
+      osc.frequency.setValueAtTime(880, now + 0.08); // A5
+
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.26);
+    } catch {}
+  }
+
+  /**
    * Speaks a clear French/international voice synthesis message
    */
   public speak(text: string, lang = 'fr-FR', onEnd?: () => void): void {

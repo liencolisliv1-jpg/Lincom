@@ -17,6 +17,10 @@ import {
 } from 'firebase/firestore';
 import {
   getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  indexedDBLocalPersistence,
+  inMemoryPersistence,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
@@ -44,8 +48,16 @@ export const db = (firebaseConfig as any).firestoreDatabaseId
   ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
   : getFirestore(app);
 
-// Initialize Firebase Authentication
+// Initialize Firebase Authentication with multi-tier storage fallback
 export const auth = getAuth(app);
+
+// Configure resilient client-side persistence for iframes, partitioned storage, and incognito
+if (typeof window !== 'undefined') {
+  setPersistence(auth, indexedDBLocalPersistence)
+    .catch(() => setPersistence(auth, browserLocalPersistence))
+    .catch(() => setPersistence(auth, inMemoryPersistence))
+    .catch((err) => console.warn('Firebase auth persistence setup warning:', err));
+}
 
 let cachedGoogleAccessToken: string | null = null;
 

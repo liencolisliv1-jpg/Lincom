@@ -25,6 +25,7 @@ import {
   Share2,
   Bell,
   Percent,
+  Trash2,
 } from 'lucide-react';
 
 interface ClassifiedAdsBoardProps {
@@ -371,6 +372,22 @@ export const ClassifiedAdsBoard: React.FC<ClassifiedAdsBoardProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* Delete Button for Author or Admin */}
+                  {(currentUser && (currentUser.id === ad.authorId || currentUser.role === 'admin')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Supprimer définitivement cette annonce "${ad.title}" ?`)) {
+                          onDeleteAd(ad.id);
+                        }
+                      }}
+                      className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 transition-colors shadow"
+                      title="Supprimer mon annonce"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                   {isMuted ? (
                     <button
                       type="button"

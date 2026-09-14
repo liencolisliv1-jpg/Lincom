@@ -89,9 +89,9 @@ export default function App() {
     setTriggerNewDeliveryModal((prev) => prev + 1);
   };
 
-  // Reset to default state with NO demo account connected
+  // Reset to default state with NO demo account connected (clean visitor state for registration)
   useEffect(() => {
-    const RESET_FLAG = 'liencolis_app_clean_reset_fresh_v2026_09';
+    const RESET_FLAG = 'liencolis_app_clean_reset_fresh_v2026_09_registration_default';
     if (!localStorage.getItem(RESET_FLAG)) {
       localStorage.setItem(RESET_FLAG, 'true');
       storageService.resetAllToDefaults();
@@ -344,6 +344,18 @@ export default function App() {
     setMessages(storageService.getMessages());
   };
 
+  const handleEditMessage = (messageId: string, newContent: string) => {
+    storageService.updateMessage(messageId, newContent);
+    firestoreService.updateMessage(messageId, newContent);
+    setMessages(storageService.getMessages());
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    storageService.deleteMessage(messageId);
+    firestoreService.deleteMessage(messageId);
+    setMessages(storageService.getMessages());
+  };
+
   const handleAddAd = (ad: ClassifiedAd) => {
     storageService.addAd(ad);
     firestoreService.saveClassifiedAd(ad);
@@ -387,6 +399,12 @@ export default function App() {
   const handleAddRentalItem = (rental: RentalItem) => {
     storageService.addRentalItem(rental);
     firestoreService.saveRentalItem(rental);
+    setRentals(storageService.getRentals());
+  };
+
+  const handleDeleteRentalItem = (id: string) => {
+    storageService.deleteRentalItem(id);
+    firestoreService.deleteRentalItem(id);
     setRentals(storageService.getRentals());
   };
 
@@ -641,6 +659,8 @@ export default function App() {
             messages={messages}
             currentUser={currentUser}
             onSendMessage={handleSendMessage}
+            onEditMessage={handleEditMessage}
+            onDeleteMessage={handleDeleteMessage}
             onOpenPayment={(purpose?: PaymentPurpose) => openPaymentWithPurpose(purpose || 'premium_badge_week')}
             onOpenProfile={() => setProfileModalOpen(true)}
             onOpenAuth={() => {
@@ -678,6 +698,7 @@ export default function App() {
             onAddMarketplaceItem={handleAddMarketplaceItem}
             onAddRentalItem={handleAddRentalItem}
             onDeleteMarketplaceItem={handleDeleteMarketplaceItem}
+            onDeleteRentalItem={handleDeleteRentalItem}
             onToggleMarketplaceItemSold={handleToggleMarketplaceItemSold}
             isDarkMode={isDarkMode}
             onOpenAuth={() => {

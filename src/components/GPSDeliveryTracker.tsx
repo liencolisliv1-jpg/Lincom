@@ -43,6 +43,7 @@ import {
   Smartphone,
   Info,
   LocateFixed,
+  Compass,
   Radio,
   Gauge,
   Zap,
@@ -161,6 +162,11 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
   const [fairPricePickup, setFairPricePickup] = useState('Cadjehoun');
   const [fairPriceDropoff, setFairPriceDropoff] = useState('Calavi Kpota');
   const [showRadarModal, setShowRadarModal] = useState(false);
+  const [activeProximityAlert, setActiveProximityAlert] = useState<{
+    type: '500m' | '300m' | 'arrived';
+    title: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     if (triggerNewDeliveryModal && triggerNewDeliveryModal > 0) {
@@ -231,6 +237,12 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
             voiceService.triggerProximityVibration('500m');
             voiceService.playAlertSound('primary_500m');
             voiceService.speak("Alerte Liencolis 500 mètres. Message automatique de proximité transmis au client.");
+            notificationService.notifyProximity500m(selectedDelivery);
+            setActiveProximityAlert({
+              type: '500m',
+              title: '⚠️ ALERTE 500M • NOTIFICATION CLIENT TRANSMISE',
+              message: `Notification automatique de proximité envoyée à ${selectedDelivery.clientPseudo || 'le destinataire'}. Le client se prépare.`,
+            });
           }
 
           // 300m Trigger: Hands-free automatic call to client
@@ -241,14 +253,25 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
             voiceService.playAlertSound('warning_300m');
             setCallTarget('client');
             setShowInAppCallModal(true);
+            notificationService.notifyAutoCall300m(selectedDelivery);
             voiceService.speak(
               "Attention ! Vous êtes à 300 mètres du point de livraison. Déclenchement automatique de l'appel vers votre client. Gardez vos mains sur le guidon.",
               'fr-FR'
             );
+            setActiveProximityAlert({
+              type: '300m',
+              title: '🚨 ALERTE 300M • DÉCLENCHEMENT APPEL AUTOMATIQUE',
+              message: `Appel direct mains-libres en cours vers ${selectedDelivery.clientPseudo || 'le client'} (${selectedDelivery.clientPhone}).`,
+            });
           }
 
           if (distanceMeters <= 25) {
             nextStatus = 'arrived';
+            setActiveProximityAlert({
+              type: 'arrived',
+              title: '📍 ARRIVÉE SUR PLACE (0M)',
+              message: `Vous êtes au point de livraison. Validez la remise avec le code PIN #${selectedDelivery.securityPin || '---'}.`,
+            });
           }
 
           const updated: Delivery = {
@@ -302,6 +325,12 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
           voiceService.triggerProximityVibration('500m');
           voiceService.playAlertSound('primary_500m');
           voiceService.speak("Alerte Liencolis 500 mètres. Message automatique de proximité transmis au client.");
+          notificationService.notifyProximity500m(selectedDelivery);
+          setActiveProximityAlert({
+            type: '500m',
+            title: '⚠️ ALERTE 500M • NOTIFICATION CLIENT TRANSMISE',
+            message: `Notification automatique de proximité envoyée à ${selectedDelivery.clientPseudo || 'le destinataire'}. Le client se prépare.`,
+          });
         }
 
         // 300m Trigger: Hands-Free auto call to client without touching phone
@@ -312,10 +341,16 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
           voiceService.playAlertSound('warning_300m');
           setCallTarget('client');
           setShowInAppCallModal(true);
+          notificationService.notifyAutoCall300m(selectedDelivery);
           voiceService.speak(
             "Attention ! Vous êtes à 300 mètres du point de livraison. Déclenchement automatique de l'appel vers votre client. Gardez vos mains sur le guidon.",
             'fr-FR'
           );
+          setActiveProximityAlert({
+            type: '300m',
+            title: '🚨 ALERTE 300M • DÉCLENCHEMENT APPEL AUTOMATIQUE',
+            message: `Appel direct mains-libres en cours vers ${selectedDelivery.clientPseudo || 'le client'} (${selectedDelivery.clientPhone}).`,
+          });
         }
 
         // 0m Trigger: Arrived
@@ -325,6 +360,11 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
           voiceService.triggerProximityVibration('arrived');
           voiceService.playAlertSound('warning_300m');
           voiceService.speak("Vous êtes arrivé au point de livraison prévu. Présentez le bouton de validation au client.");
+          setActiveProximityAlert({
+            type: 'arrived',
+            title: '🏁 ARRIVÉE SUR PLACE (0M)',
+            message: `Vous êtes au point de livraison. Validez la remise avec le code PIN #${selectedDelivery.securityPin || '---'}.`,
+          });
         }
 
         const updated: Delivery = {
@@ -346,6 +386,71 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
       }
     };
   }, [isSimulatingMotion, selectedDelivery]);
+
+  // Direct manual trigger for testing 500m notification, 300m auto call, or arrival anytime
+  const triggerManualProximityStep = (targetDistance: number) => {
+    if (!selectedDelivery) return;
+
+    let nextStatus: DeliveryStatus = selectedDelivery.status;
+    let isPrimaryAlertSent = selectedDelivery.isPrimaryAlertSent;
+    let isRobotVoiceTriggered = selectedDelivery.isRobotVoiceTriggered;
+
+    if (targetDistance === 500) {
+      nextStatus = 'nearby_500m';
+      isPrimaryAlertSent = true;
+      voiceService.triggerProximityVibration('500m');
+      voiceService.playAlertSound('primary_500m');
+      voiceService.speak("Alerte Liencolis 500 mètres. Message automatique de proximité transmis au client.");
+      notificationService.notifyProximity500m(selectedDelivery);
+      setActiveProximityAlert({
+        type: '500m',
+        title: '⚠️ ALERTE 500M • NOTIFICATION CLIENT TRANSMISE',
+        message: `Notification automatique de proximité envoyée à ${selectedDelivery.clientPseudo || 'le destinataire'}.`,
+      });
+    } else if (targetDistance === 300) {
+      nextStatus = 'alert_300m';
+      isRobotVoiceTriggered = true;
+      voiceService.triggerProximityVibration('300m');
+      voiceService.playAlertSound('warning_300m');
+      setCallTarget('client');
+      setShowInAppCallModal(true);
+      notificationService.notifyAutoCall300m(selectedDelivery);
+      voiceService.speak(
+        "Attention ! Vous êtes à 300 mètres du point de livraison. Déclenchement automatique de l'appel vers votre client. Gardez vos mains sur le guidon.",
+        'fr-FR'
+      );
+      setActiveProximityAlert({
+        type: '300m',
+        title: '🚨 ALERTE 300M • DÉCLENCHEMENT APPEL AUTOMATIQUE',
+        message: `Appel direct sans contact vers ${selectedDelivery.clientPseudo || 'Client'} (${selectedDelivery.clientPhone}) en cours.`,
+      });
+    } else if (targetDistance === 0) {
+      nextStatus = 'arrived';
+      voiceService.triggerProximityVibration('arrived');
+      voiceService.playAlertSound('warning_300m');
+      voiceService.speak("Vous êtes arrivé au point de livraison prévu. Présentez le bouton de validation au client.");
+      setActiveProximityAlert({
+        type: 'arrived',
+        title: '🏁 POINT DE LIVRAISON ATTEINT (0M)',
+        message: `Vous êtes sur place. Code PIN requis pour validation : #${selectedDelivery.securityPin || '---'}.`,
+      });
+    } else if (targetDistance === 1200) {
+      nextStatus = 'in_transit';
+      isPrimaryAlertSent = false;
+      isRobotVoiceTriggered = false;
+      setActiveProximityAlert(null);
+    }
+
+    const updated: Delivery = {
+      ...selectedDelivery,
+      distanceRemainingMeters: targetDistance,
+      status: nextStatus,
+      isPrimaryAlertSent,
+      isRobotVoiceTriggered,
+      estimatedArrivalMinutes: Math.max(1, Math.ceil(targetDistance / 300)),
+    };
+    onUpdateDelivery(updated);
+  };
 
   // Handle voice command recognition
   const handleVoiceCommand = (transcript: string, action: string) => {
@@ -801,6 +906,50 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
           {/* Main Map & Interactive Route Navigation View (7 cols) */}
           <div className="lg:col-span-7 space-y-4">
             <div className="relative rounded-2xl bg-slate-900 border border-slate-700/80 overflow-hidden shadow-2xl">
+              {/* Dynamic Proximity & Auto-Call Alert Banner (500m / 300m / Arrivée) */}
+              {activeProximityAlert && (
+                <div
+                  className={`p-3.5 border-b flex items-center justify-between gap-3 text-xs transition-all animate-in slide-in-from-top duration-300 ${
+                    activeProximityAlert.type === '300m'
+                      ? 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white border-red-500/80 shadow-xl'
+                      : activeProximityAlert.type === '500m'
+                      ? 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-slate-950 border-amber-300 shadow-lg font-bold'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-400 shadow-lg font-bold'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="px-2.5 py-1 rounded-xl bg-black/25 text-white font-black text-xs tracking-wider uppercase flex items-center gap-1">
+                      {activeProximityAlert.type === '300m' ? (
+                        <>
+                          <PhoneCall className="w-3.5 h-3.5 animate-bounce" />
+                          <span>300M APPEL AUTO</span>
+                        </>
+                      ) : activeProximityAlert.type === '500m' ? (
+                        <>
+                          <Radio className="w-3.5 h-3.5 animate-pulse" />
+                          <span>500M NOTIFICATION</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>0M ARRIVÉE</span>
+                        </>
+                      )}
+                    </span>
+                    <div>
+                      <div className="font-black text-xs">{activeProximityAlert.title}</div>
+                      <div className="text-[11px] opacity-90">{activeProximityAlert.message}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveProximityAlert(null)}
+                    className="px-2.5 py-1 rounded-lg bg-black/20 hover:bg-black/35 text-white font-bold text-[10px] transition-colors"
+                  >
+                    Masquer
+                  </button>
+                </div>
+              )}
+
               {/* TOP MASTER MAP TOOLBAR - ALWAYS VISIBLE, SHARP & UNCLUTTERED */}
               <div className="p-3.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
                 {/* Destination and Security Anti-Theft Pin */}
@@ -1173,6 +1322,74 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
                 </div>
               )}
 
+              {/* Universal Proximity & Motion Control Bar (Visible across all Map modes) */}
+              <div className="p-3 bg-slate-900 border-t border-slate-850 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-bold text-[11px]">
+                    <Compass className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Contrôle Trajet & Proximité :</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Play / Pause continuous simulation */}
+                  <button
+                    onClick={() => setIsSimulatingMotion(!isSimulatingMotion)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black shadow-md flex items-center gap-1.5 transition-all ${
+                      isSimulatingMotion ? 'bg-amber-500 text-slate-950 hover:bg-amber-400' : 'bg-blue-600 hover:bg-blue-500 text-white'
+                    }`}
+                    title={isSimulatingMotion ? 'Mettre en pause le déplacement' : 'Lancer le déplacement simulé le long de l\'itinéraire'}
+                    id="toggle-simulate-motion-btn"
+                  >
+                    <Play className={`w-3.5 h-3.5 ${isSimulatingMotion ? 'fill-current' : ''}`} />
+                    <span>{isSimulatingMotion ? 'Pause Trajet' : 'Avance Continue'}</span>
+                  </button>
+
+                  {/* Trigger 500m notification */}
+                  <button
+                    onClick={() => triggerManualProximityStep(500)}
+                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-black shadow-sm flex items-center gap-1.5 transition-all active:scale-95"
+                    title="Déclencher immédiatement l'alerte 500m et la notification client"
+                    id="trigger-500m-test-btn"
+                  >
+                    <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                    <span>⚡ Tester 500m</span>
+                  </button>
+
+                  {/* Trigger 300m auto call */}
+                  <button
+                    onClick={() => triggerManualProximityStep(300)}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition-all active:scale-95 animate-pulse"
+                    title="Déclencher immédiatement l'alerte 300m et l'appel mains-libres automatique"
+                    id="trigger-300m-call-test-btn"
+                  >
+                    <PhoneCall className="w-3.5 h-3.5 text-white" />
+                    <span>🚨 Tester Appel 300m</span>
+                  </button>
+
+                  {/* Trigger Arrival */}
+                  <button
+                    onClick={() => triggerManualProximityStep(0)}
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold shadow-sm flex items-center gap-1 transition-all"
+                    title="Simuler l'arrivée à destination (0 mètre)"
+                    id="trigger-arrival-test-btn"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Arrivée 0m</span>
+                  </button>
+
+                  {/* Reset */}
+                  <button
+                    onClick={() => triggerManualProximityStep(1200)}
+                    className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                    title="Réinitialiser la course à 1200m"
+                    id="reset-proximity-distance-btn"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
               {/* Progress Bar for Distance */}
               <div className="p-3 bg-slate-800/80 border-t border-slate-700 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
@@ -1200,28 +1417,30 @@ export const GPSDeliveryTracker: React.FC<GPSDeliveryTrackerProps> = ({
               <div className="p-3 bg-slate-900 border-t border-slate-700/80 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="text-slate-300 font-bold flex items-center gap-1.5">
                   <Navigation className="w-4 h-4 text-amber-400" />
-                  <span>Applications GPS Externes :</span>
+                  <span>Itinéraire &amp; Navigation GPS Directe :</span>
                 </span>
                 <div className="flex items-center gap-2 flex-wrap">
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedDelivery.dropoffAddress}, ${selectedDelivery.dropoffCity}`)}`}
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${selectedDelivery.dropoffAddress}, ${selectedDelivery.dropoffCity}, Bénin`)}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                    title="Ouvrir le guidage GPS turn-by-turn dans Google Maps"
                   >
                     <MapPin className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Google Maps</span>
+                    <span>Google Maps Itinéraire</span>
                     <ExternalLink className="w-3 h-3 text-blue-200" />
                   </a>
 
                   <a
-                    href={`https://waze.com/ul?q=${encodeURIComponent(`${selectedDelivery.dropoffAddress} ${selectedDelivery.dropoffCity}`)}&navigate=yes`}
+                    href={`https://waze.com/ul?q=${encodeURIComponent(`${selectedDelivery.dropoffAddress}, ${selectedDelivery.dropoffCity}, Bénin`)}&navigate=yes`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                    title="Ouvrir la navigation GPS en direct dans Waze"
                   >
                     <Navigation className="w-3.5 h-3.5 text-cyan-200" />
-                    <span>Waze</span>
+                    <span>Waze GPS</span>
                     <ExternalLink className="w-3 h-3 text-cyan-200" />
                   </a>
 

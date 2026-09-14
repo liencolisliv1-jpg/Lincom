@@ -192,6 +192,14 @@ export interface LiveLocationData {
   accuracyMeters?: number;
 }
 
+export interface MessageReplyInfo {
+  id: string;
+  messageId?: string;
+  senderName: string;
+  text: string;
+  mediaType?: 'image' | 'audio' | 'location';
+}
+
 export interface ChatMessage {
   id: string;
   groupId: string; // 'global' or city name e.g. 'cotonou'
@@ -216,6 +224,9 @@ export interface ChatMessage {
   timestamp: string;
   translatedText?: Record<string, string>; // langCode -> translation
   reactions?: Record<string, number>;
+  isEdited?: boolean;
+  editedAt?: string;
+  replyTo?: MessageReplyInfo;
 }
 
 export type CustomGroupCategory = 'drivers_team' | 'neighborhood' | 'logistics' | 'commercial' | 'social';
@@ -340,7 +351,18 @@ export interface MarketplaceItem {
   description: string;
   price: number;
   condition: 'new' | 'used';
-  category: 'helmet' | 'gps_mount' | 'delivery_bag' | 'jacket' | 'spare_parts' | 'other';
+  category:
+    | 'helmet'
+    | 'gps_mount'
+    | 'delivery_bag'
+    | 'jacket'
+    | 'spare_parts'
+    | 'electronics'
+    | 'clothing'
+    | 'food_grocery'
+    | 'beauty_health'
+    | 'home_appliances'
+    | 'other';
   imageUrl: string;
   images?: string[]; // Multiple photos under different angles (up to 5 photos)
   sellerId: string;
@@ -404,6 +426,9 @@ export interface DirectConversationMessage {
   rentalDaysRequested?: number;
   offerStatus?: 'pending' | 'accepted' | 'declined';
   timestamp: string;
+  isEdited?: boolean;
+  editedAt?: string;
+  replyTo?: MessageReplyInfo;
 }
 
 export interface DirectConversation {
@@ -496,6 +521,8 @@ export type NotificationType =
   | 'kyc_approved'
   | 'route_optimized'
   | 'subscription_expiry'
+  | 'proximity_500m'
+  | 'auto_call_300m'
   | 'system_alert'
   | 'system';
 

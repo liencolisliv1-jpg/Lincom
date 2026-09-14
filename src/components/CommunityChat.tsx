@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { motion } from 'motion/react';
 import {
   ChatMessage,
   UserProfile,
@@ -8,6 +9,7 @@ import {
   CustomChatGroup,
   MarketplaceItem,
   RentalItem,
+  MessageReplyInfo,
 } from '../types';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { EmojiStickerPicker, DriverSticker } from './EmojiStickerPicker';
@@ -64,7 +66,12 @@ import {
   Headphones,
   ShoppingBag,
   Plus,
+  X,
+  Paperclip,
   Trash2,
+  Edit2,
+  Check,
+  Reply,
   UserPlus,
   LogOut,
   Tag,
@@ -78,6 +85,8 @@ interface CommunityChatProps {
   messages: ChatMessage[];
   currentUser: UserProfile | null;
   onSendMessage: (message: ChatMessage) => void;
+  onEditMessage?: (messageId: string, newContent: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
   onOpenPayment: (purpose?: PaymentPurpose) => void;
   onOpenProfile?: () => void;
   onUpdateUser?: (updated: UserProfile) => void;
@@ -346,6 +355,8 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
   messages,
   currentUser,
   onSendMessage,
+  onEditMessage,
+  onDeleteMessage,
   onOpenPayment,
   onOpenProfile,
   onUpdateUser,
@@ -367,6 +378,10 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
   const [customGroupSearch, setCustomGroupSearch] = useState<string>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('global');
   const [inputText, setInputText] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editMessageText, setEditMessageText] = useState<string>('');
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<MessageReplyInfo | null>(null);
   const [moderationWarning, setModerationWarning] = useState<string | null>(null);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -384,6 +399,7 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
   const [showLiveLocationModal, setShowLiveLocationModal] = useState<boolean>(false);
   const [showWalkieTalkieModal, setShowWalkieTalkieModal] = useState<boolean>(false);
+  const [showAttachmentsMenu, setShowAttachmentsMenu] = useState<boolean>(false);
   const [autoPlayIncomingAudio, setAutoPlayIncomingAudio] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('liencolis_autoplay_radio') === 'true';
@@ -643,18 +659,19 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
       senderName: currentUser?.name || 'Germain Mensah',
       senderRole: currentUser?.role || 'driver',
       senderCity: currentUser?.city || 'Cotonou',
-      senderAvatar: currentUser?.avatarUrl,
+      ...(currentUser?.avatarUrl ? { senderAvatar: currentUser.avatarUrl } : {}),
       isDriverCertified: currentUser?.isCertified ?? true,
       hasPremiumBadge: currentUserHasVip,
       content: inputText.trim(),
-      mediaUrl: selectedMediaUrl || undefined,
-      mediaType: selectedMediaUrl ? 'image' : undefined,
+      ...(selectedMediaUrl ? { mediaUrl: selectedMediaUrl, mediaType: 'image' as const } : {}),
       timestamp: now.toISOString(),
+      ...(replyingToMessage ? { replyTo: replyingToMessage } : {}),
     };
 
     onSendMessage(newMsg);
     setInputText('');
     setSelectedMediaUrl(null);
+    setReplyingToMessage(null);
   };
 
   const handleSelectEmoji = (emoji: string) => {
@@ -785,6 +802,58 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
         setPlayingAudioId((prev) => (prev === msg.id ? null : prev));
       }, Math.max(3000, (msg.audioDurationSeconds || 3) * 1000));
     }
+  };
+
+  // Edit and Delete Message Handlers
+  const handleStartEdit = (msg: ChatMessage) => {
+    setEditingMessageId(msg.id);
+    setEditMessageText(msg.content || '');
+    setDeletingMessageId(null);
+  };
+
+  const handleSaveEdit = (msgId: string) => {
+    const trimmed = editMessageText.trim();
+    if (!trimmed) return;
+
+    if (onEditMessage) {
+      onEditMessage(msgId, trimmed);
+    } else {
+      storageService.updateMessage(msgId, trimmed);
+    }
+    setEditingMessageId(null);
+    setEditMessageText('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditMessageText('');
+  };
+
+  const handleConfirmDelete = (msgId: string) => {
+    if (onDeleteMessage) {
+      onDeleteMessage(msgId);
+    } else {
+      storageService.deleteMessage(msgId);
+    }
+    setDeletingMessageId(null);
+  };
+
+  // Swipe / Drag to Reply Trigger
+  const handleTriggerReply = (msg: ChatMessage) => {
+    setReplyingToMessage({
+      id: msg.id,
+      senderName: msg.senderName,
+      text: msg.content || (msg.mediaUrl ? '📷 Photo partagée' : msg.audioUrl ? '🎙️ Message vocal' : msg.location ? '🛰️ Position GPS' : msg.stickerTitle ? `🎨 Sticker: ${msg.stickerTitle}` : 'Message'),
+      mediaType: msg.mediaUrl ? 'image' : msg.audioUrl ? 'audio' : msg.location ? 'location' : undefined,
+    });
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate?.(25);
+      } catch {}
+    }
+    setTimeout(() => {
+      chatInputRef.current?.focus();
+    }, 50);
   };
 
   // Live Location Share Handler
@@ -1877,22 +1946,174 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                         )}
 
                         <span className="text-slate-500">• {formattedDate} {formattedTime}</span>
+
+                        {/* Edited status tag */}
+                        {msg.isEdited && (
+                          <span className="text-amber-400/90 font-medium italic text-[9px] bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/30" title={`Modifié le ${msg.editedAt ? new Date(msg.editedAt).toLocaleString('fr-FR') : ''}`}>
+                            (modifié)
+                          </span>
+                        )}
+
+                        {/* Swipe / Quick Reply action button (Accessible to everyone) */}
+                        {editingMessageId !== msg.id && deletingMessageId !== msg.id && (
+                          <button
+                            type="button"
+                            onClick={() => handleTriggerReply(msg)}
+                            className="p-1 rounded hover:bg-slate-700/80 text-slate-400 hover:text-amber-300 transition-colors flex items-center gap-1 opacity-75 hover:opacity-100"
+                            title="Glisser vers la droite ou cliquer pour répondre"
+                          >
+                            <Reply className="w-3 h-3 text-amber-400" />
+                            <span className="text-[9px] hidden sm:inline font-semibold text-amber-300/90">Répondre</span>
+                          </button>
+                        )}
+
+                        {/* Edit & Delete Action Buttons for sender or admin */}
+                        {(isMe || currentUser?.role === 'admin') && editingMessageId !== msg.id && deletingMessageId !== msg.id && (
+                          <div className="flex items-center gap-1 ml-0.5 opacity-70 hover:opacity-100 transition-opacity">
+                            {!msg.isWalkieTalkie && !msg.location && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(msg)}
+                                className="p-1 rounded hover:bg-slate-700/80 text-slate-400 hover:text-sky-300 transition-colors"
+                                title="Modifier le message en cas d'erreur"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setDeletingMessageId(msg.id)}
+                              className="p-1 rounded hover:bg-red-900/50 text-slate-400 hover:text-red-400 transition-colors"
+                              title="Supprimer ce message"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Message Bubble (Messenger Style) */}
-                      <div
-                        className={`rounded-2xl p-3.5 shadow-md text-xs relative ${
-                          isMe
-                            ? msg.hasPremiumBadge
-                              ? 'bg-gradient-to-br from-blue-600 to-blue-700 border border-amber-400/50 text-white rounded-tr-none shadow-amber-500/10'
-                              : 'bg-blue-600 text-white rounded-tr-none'
-                            : msg.hasPremiumBadge
-                            ? 'bg-slate-800 border-2 border-amber-500/60 text-slate-100 rounded-tl-none shadow-md shadow-amber-500/10'
-                            : 'bg-slate-800 border border-slate-700/80 text-slate-100 rounded-tl-none'
-                        }`}
-                      >
-                        {/* Live Location Card Render */}
-                        {msg.location ? (
+                      {/* Delete Confirmation Box */}
+                      {deletingMessageId === msg.id && (
+                        <div className="w-full max-w-sm p-3 rounded-2xl bg-red-950/95 border border-red-500/70 shadow-lg text-xs space-y-2.5 animate-in fade-in">
+                          <div className="flex items-start gap-2">
+                            <Trash2 className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-red-100 text-xs">Supprimer ce message ?</p>
+                              <p className="text-[11px] text-red-300/90 mt-0.5">Le message sera effacé pour tous les utilisateurs du salon.</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setDeletingMessageId(null)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                            >
+                              Annuler
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmDelete(msg.id)}
+                              className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors shadow-md shadow-red-900/50"
+                            >
+                              Oui, supprimer
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Message Bubble with Drag to Reply & Quote Display */}
+                      {editingMessageId === msg.id ? (
+                        <div className="w-full max-w-md rounded-2xl p-3.5 bg-slate-900 border-2 border-sky-500 shadow-xl space-y-2.5 animate-in fade-in">
+                          <div className="flex items-center justify-between text-[11px] text-sky-400 font-bold">
+                            <div className="flex items-center gap-1.5">
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span>Modifier le message</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-normal">Corriger une erreur</span>
+                          </div>
+                          <textarea
+                            value={editMessageText}
+                            onChange={(e) => setEditMessageText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSaveEdit(msg.id);
+                              } else if (e.key === 'Escape') {
+                                handleCancelEdit();
+                              }
+                            }}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400 resize-none min-h-[70px]"
+                            placeholder="Corrigez votre message..."
+                            autoFocus
+                          />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-slate-400">Entrée pour valider • Échap pour annuler</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                                <span>Annuler</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEdit(msg.id)}
+                                disabled={!editMessageText.trim()}
+                                className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1 transition-colors shadow"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Enregistrer</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                      <div className="relative w-full group select-none">
+                        {/* Swipe Behind Indicator (reveals when swiping right) */}
+                        <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-start pl-1 pointer-events-none text-amber-400">
+                          <div className="w-7 h-7 rounded-full bg-amber-400/20 border border-amber-400/50 flex items-center justify-center scale-90 shadow">
+                            <Reply className="w-3.5 h-3.5 text-amber-300" />
+                          </div>
+                        </div>
+
+                        {/* Draggable Message Bubble */}
+                        <motion.div
+                          drag="x"
+                          dragConstraints={{ left: 0, right: 65 }}
+                          dragElastic={0.2}
+                          dragSnapToOrigin
+                          onDragEnd={(_, info) => {
+                            if (info.offset.x > 35 || info.velocity.x > 120) {
+                              handleTriggerReply(msg);
+                            }
+                          }}
+                          className={`rounded-2xl p-3.5 shadow-md text-xs relative cursor-grab active:cursor-grabbing ${
+                            isMe
+                              ? msg.hasPremiumBadge
+                                ? 'bg-gradient-to-br from-blue-600 to-blue-700 border border-amber-400/50 text-white rounded-tr-none shadow-amber-500/10'
+                                : 'bg-blue-600 text-white rounded-tr-none'
+                              : msg.hasPremiumBadge
+                              ? 'bg-slate-800 border-2 border-amber-500/60 text-slate-100 rounded-tl-none shadow-md shadow-amber-500/10'
+                              : 'bg-slate-800 border border-slate-700/80 text-slate-100 rounded-tl-none'
+                          }`}
+                        >
+                          {/* Quote / Replying To Block */}
+                          {msg.replyTo && (
+                            <div className="mb-2 p-2 rounded-xl bg-black/35 border-l-4 border-amber-400 text-left text-xs text-slate-200">
+                              <div className="flex items-center gap-1 font-bold text-amber-300 text-[11px]">
+                                <Reply className="w-3 h-3 text-amber-400 rotate-180 scale-y-[-1]" />
+                                <span>{msg.replyTo.senderName}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-300/90 truncate mt-0.5 line-clamp-2">
+                                {msg.replyTo.text}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Live Location Card Render */}
+                          {msg.location ? (
                           <div className="py-1">
                             <LiveLocationCard
                               location={msg.location}
@@ -2062,7 +2283,9 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                             </button>
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
+                    </div>
+                    )}
                     </div>
                   </div>
                 );
@@ -2078,6 +2301,34 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                 <span>{moderationWarning}</span>
               </div>
               <button onClick={() => setModerationWarning(null)} className="text-red-300 hover:text-white font-bold">✕</button>
+            </div>
+          )}
+
+          {/* Replying To Quote Banner (Shows above input when replying) */}
+          {replyingToMessage && (
+            <div className="p-2.5 px-3 bg-slate-900/95 border-t-2 border-amber-400 flex items-center justify-between gap-3 shadow-lg animate-in slide-in-from-bottom-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-amber-400/20 border border-amber-400/40 flex items-center justify-center shrink-0">
+                  <Reply className="w-3.5 h-3.5 text-amber-300" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <span>Réponse à</span>
+                    <span className="text-white font-semibold">{replyingToMessage.senderName}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-300/80 truncate max-w-xs sm:max-w-md mt-0.5">
+                    {replyingToMessage.text}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyingToMessage(null)}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white shrink-0 transition-colors"
+                title="Annuler la réponse"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           )}
 
@@ -2191,57 +2442,138 @@ export const CommunityChat: React.FC<CommunityChatProps> = ({
                     }}
                   />
 
-                  {/* Media, Camera, GPS and Voice buttons (in City Groups) - Distinct colorful badges */}
+                  {/* Unified Multi-Tools Attachment Button (GPS, Photo, Talkie-Walkie, Voice) */}
                   {!selectedGroup.isGlobal ? (
-                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
-                      {/* 1. GPS Live Sharing Button */}
+                    <div className="relative shrink-0">
                       <button
                         type="button"
-                        onClick={() => setShowLiveLocationModal(true)}
-                        className="px-2.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                        title="Partager ma position GPS en direct ou un repère"
-                        id="btn-share-gps-chat"
+                        onClick={() => setShowAttachmentsMenu(!showAttachmentsMenu)}
+                        className={`p-2.5 rounded-2xl flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer ${
+                          showAttachmentsMenu
+                            ? 'bg-amber-500 text-slate-950 font-bold scale-105 shadow-amber-500/20'
+                            : 'bg-gradient-to-r from-emerald-500/20 via-sky-500/20 to-purple-500/20 hover:from-emerald-500/30 hover:to-purple-500/30 text-amber-300 border border-amber-500/40 hover:border-amber-400'
+                        }`}
+                        title="Outils & Envois (Position GPS, Photos, Talkie-Walkie CB, Message Vocal)"
+                        id="btn-unified-chat-attachments"
                       >
-                        <Navigation className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400" />
-                        <span className="hidden md:inline">Position</span>
-                        <span>GPS</span>
+                        <Plus className={`w-4 h-4 transition-transform duration-200 ${showAttachmentsMenu ? 'rotate-45 text-slate-950 stroke-[3]' : 'text-amber-400 stroke-[2.5]'}`} />
+                        <span className="text-xs font-bold hidden sm:inline">Outils</span>
                       </button>
 
-                      {/* 2. Camera / Photo Capture Button */}
-                      <button
-                        type="button"
-                        onClick={() => setShowCameraModal(true)}
-                        className="px-2.5 py-2 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                        title="Prendre une photo ou ajouter une image de colis"
-                        id="btn-camera-chat"
-                      >
-                        <Camera className="w-3.5 h-3.5 text-sky-400" />
-                        <span>Photo</span>
-                      </button>
+                      {/* Unified Dropup Menu */}
+                      {showAttachmentsMenu && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={() => setShowAttachmentsMenu(false)}
+                          />
+                          <div className="absolute bottom-full left-0 mb-2 z-40 w-72 bg-slate-900/98 backdrop-blur-xl border border-slate-700/90 rounded-2xl p-2 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-150">
+                            <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-2.5 py-1.5 border-b border-slate-800 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 text-amber-400">
+                                <Paperclip className="w-3.5 h-3.5" />
+                                <span>Outils & Partages</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setShowAttachmentsMenu(false)}
+                                className="p-0.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
 
-                      {/* 3. Voice Recording Button */}
-                      <button
-                        type="button"
-                        onClick={() => setIsRecordingVoice(true)}
-                        className="px-2.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                        title="Enregistrer un message vocal"
-                        id="btn-voice-recorder"
-                      >
-                        <Mic className="w-3.5 h-3.5 text-rose-400" />
-                        <span className="hidden sm:inline">Vocal</span>
-                      </button>
+                            <div className="grid grid-cols-1 gap-1 pt-1.5">
+                              {/* 1. GPS Live Sharing */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAttachmentsMenu(false);
+                                  setShowLiveLocationModal(true);
+                                }}
+                                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-emerald-500/15 text-slate-200 hover:text-emerald-300 transition-colors text-left group cursor-pointer border border-transparent hover:border-emerald-500/30"
+                                id="btn-menu-share-gps"
+                              >
+                                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-sm">
+                                  <Navigation className="w-4 h-4 text-emerald-400 fill-emerald-400" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-slate-100 group-hover:text-emerald-300 flex items-center gap-1">
+                                    <span>Position GPS en direct</span>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">GPS</span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">Partager un repère ou votre position temps réel</div>
+                                </div>
+                              </button>
 
-                      {/* 4. Talkie-Walkie CB Radio Button */}
-                      <button
-                        type="button"
-                        onClick={() => setShowWalkieTalkieModal(true)}
-                        className="p-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                        title="Talkie-Walkie CB & Alertes Guidon"
-                        id="btn-walkie-talkie-chat"
-                      >
-                        <Radio className="w-3.5 h-3.5 text-purple-400" />
-                        <span className="hidden lg:inline">Radio</span>
-                      </button>
+                              {/* 2. Photo / Camera */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAttachmentsMenu(false);
+                                  setShowCameraModal(true);
+                                }}
+                                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-sky-500/15 text-slate-200 hover:text-sky-300 transition-colors text-left group cursor-pointer border border-transparent hover:border-sky-500/30"
+                                id="btn-menu-camera"
+                              >
+                                <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-sm">
+                                  <Camera className="w-4 h-4 text-sky-400" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-slate-100 group-hover:text-sky-300 flex items-center gap-1">
+                                    <span>Prendre / Envoyer Photo</span>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono">Photo</span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">Photo de colis, reçu, rue ou stationnement</div>
+                                </div>
+                              </button>
+
+                              {/* 3. Talkie-Walkie CB */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAttachmentsMenu(false);
+                                  setShowWalkieTalkieModal(true);
+                                }}
+                                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-purple-500/15 text-slate-200 hover:text-purple-300 transition-colors text-left group cursor-pointer border border-transparent hover:border-purple-500/30"
+                                id="btn-menu-walkie-talkie"
+                              >
+                                <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-sm">
+                                  <Radio className="w-4 h-4 text-purple-400" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-slate-100 group-hover:text-purple-300 flex items-center gap-1">
+                                    <span>Talkie-Walkie CB</span>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">Radio</span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">Canal radio vocal & alertes guidon mains-libres</div>
+                                </div>
+                              </button>
+
+                              {/* 4. Voice Recording */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAttachmentsMenu(false);
+                                  setIsRecordingVoice(true);
+                                }}
+                                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-rose-500/15 text-slate-200 hover:text-rose-300 transition-colors text-left group cursor-pointer border border-transparent hover:border-rose-500/30"
+                                id="btn-menu-voice-recorder"
+                              >
+                                <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-sm">
+                                  <Mic className="w-4 h-4 text-rose-400" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-slate-100 group-hover:text-rose-300 flex items-center gap-1">
+                                    <span>Message Vocal</span>
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">Vocal</span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">Enregistrer et expédier un mémo vocal direct</div>
+                                </div>
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div className="p-1 text-[10px] text-slate-500 flex items-center gap-1 font-mono shrink-0" title="Texte uniquement dans le grand groupe">

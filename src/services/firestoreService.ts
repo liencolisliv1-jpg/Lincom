@@ -30,12 +30,34 @@ import {
   AppLicense,
 } from '../types';
 
+// Helper to recursively strip undefined fields from Firestore write payloads
+function sanitizeForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, any>)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
 export const firestoreService = {
   // Sync Delivery to Firestore Cloud
   async saveDelivery(delivery: Delivery): Promise<void> {
     try {
       const deliveryRef = doc(db, 'deliveries', delivery.id);
-      await setDoc(deliveryRef, delivery, { merge: true });
+      await setDoc(deliveryRef, sanitizeForFirestore(delivery), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `deliveries/${delivery.id}`);
     }
@@ -106,9 +128,33 @@ export const firestoreService = {
   async saveMessage(message: ChatMessage): Promise<void> {
     try {
       const msgRef = doc(db, 'messages', message.id);
-      await setDoc(msgRef, message, { merge: true });
+      await setDoc(msgRef, sanitizeForFirestore(message), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `messages/${message.id}`);
+    }
+  },
+
+  // Update Community Message
+  async updateMessage(messageId: string, newContent: string): Promise<void> {
+    try {
+      const msgRef = doc(db, 'messages', messageId);
+      await updateDoc(msgRef, sanitizeForFirestore({
+        content: newContent,
+        isEdited: true,
+        editedAt: new Date().toISOString(),
+      }));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `messages/${messageId}`);
+    }
+  },
+
+  // Delete Community Message
+  async deleteMessage(messageId: string): Promise<void> {
+    try {
+      const msgRef = doc(db, 'messages', messageId);
+      await deleteDoc(msgRef);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `messages/${messageId}`);
     }
   },
 
@@ -166,7 +212,7 @@ export const firestoreService = {
   async saveRentalItem(item: RentalItem): Promise<void> {
     try {
       const rentalRef = doc(db, 'rentals', item.id);
-      await setDoc(rentalRef, item, { merge: true });
+      await setDoc(rentalRef, sanitizeForFirestore(item), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `rentals/${item.id}`);
     }
@@ -201,7 +247,7 @@ export const firestoreService = {
   async saveMarketplaceItem(item: MarketplaceItem): Promise<void> {
     try {
       const itemRef = doc(db, 'marketplace', item.id);
-      await setDoc(itemRef, item, { merge: true });
+      await setDoc(itemRef, sanitizeForFirestore(item), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `marketplace/${item.id}`);
     }
@@ -255,7 +301,7 @@ export const firestoreService = {
   async saveConversation(conv: DirectConversation): Promise<void> {
     try {
       const convRef = doc(db, 'conversations', conv.id);
-      await setDoc(convRef, conv, { merge: true });
+      await setDoc(convRef, sanitizeForFirestore(conv), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `conversations/${conv.id}`);
     }
@@ -265,7 +311,7 @@ export const firestoreService = {
   async saveConversationMessage(message: DirectConversationMessage): Promise<void> {
     try {
       const msgRef = doc(db, `conversations/${message.conversationId}/messages`, message.id);
-      await setDoc(msgRef, message, { merge: true });
+      await setDoc(msgRef, sanitizeForFirestore(message), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `conversations/${message.conversationId}/messages/${message.id}`);
     }
@@ -300,7 +346,7 @@ export const firestoreService = {
   async saveCustomGroup(group: CustomChatGroup): Promise<void> {
     try {
       const grpRef = doc(db, 'customGroups', group.id);
-      await setDoc(grpRef, group, { merge: true });
+      await setDoc(grpRef, sanitizeForFirestore(group), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `customGroups/${group.id}`);
     }
@@ -360,7 +406,7 @@ export const firestoreService = {
   async saveUserProfile(user: UserProfile): Promise<void> {
     try {
       const userRef = doc(db, 'users', user.id);
-      await setDoc(userRef, user, { merge: true });
+      await setDoc(userRef, sanitizeForFirestore(user), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${user.id}`);
     }
@@ -370,7 +416,7 @@ export const firestoreService = {
   async saveAdminSummary(summary: DailyAdministrativeSummary): Promise<void> {
     try {
       const summaryRef = doc(db, 'adminSummaries', summary.id);
-      await setDoc(summaryRef, summary, { merge: true });
+      await setDoc(summaryRef, sanitizeForFirestore(summary), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `adminSummaries/${summary.id}`);
     }
@@ -380,7 +426,7 @@ export const firestoreService = {
   async saveClassifiedAd(ad: ClassifiedAd): Promise<void> {
     try {
       const adRef = doc(db, 'classifiedAds', ad.id);
-      await setDoc(adRef, ad, { merge: true });
+      await setDoc(adRef, sanitizeForFirestore(ad), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `classifiedAds/${ad.id}`);
     }
@@ -399,7 +445,7 @@ export const firestoreService = {
   async saveAidRequest(req: AidRequest): Promise<void> {
     try {
       const reqRef = doc(db, 'aidRequests', req.id);
-      await setDoc(reqRef, req, { merge: true });
+      await setDoc(reqRef, sanitizeForFirestore(req), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `aidRequests/${req.id}`);
     }
@@ -435,7 +481,7 @@ export const firestoreService = {
   async saveNotification(notif: AppNotification): Promise<void> {
     try {
       const notifRef = doc(db, 'pushNotifications', notif.id);
-      await setDoc(notifRef, notif, { merge: true });
+      await setDoc(notifRef, sanitizeForFirestore(notif), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `pushNotifications/${notif.id}`);
     }
@@ -445,7 +491,7 @@ export const firestoreService = {
   async saveLicense(license: AppLicense): Promise<void> {
     try {
       const licRef = doc(db, 'licenses', license.id);
-      await setDoc(licRef, license, { merge: true });
+      await setDoc(licRef, sanitizeForFirestore(license), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `licenses/${license.id}`);
     }

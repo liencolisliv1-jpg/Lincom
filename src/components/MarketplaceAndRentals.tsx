@@ -56,6 +56,7 @@ interface MarketplaceAndRentalsProps {
   onAddMarketplaceItem: (item: MarketplaceItem) => void;
   onAddRentalItem: (rental: RentalItem) => void;
   onDeleteMarketplaceItem?: (id: string) => void;
+  onDeleteRentalItem?: (id: string) => void;
   onToggleMarketplaceItemSold?: (id: string) => void;
   isDarkMode: boolean;
   onOpenAuth?: () => void;
@@ -70,6 +71,7 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
   onAddMarketplaceItem,
   onAddRentalItem,
   onDeleteMarketplaceItem,
+  onDeleteRentalItem,
   onToggleMarketplaceItemSold,
   isDarkMode,
   onOpenAuth,
@@ -137,6 +139,57 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
   const clearSelection = () => {
     setSelectedItemIds(new Set());
     setIsSelectionMode(false);
+  };
+
+  const handleBulkDeleteSelected = () => {
+    if (selectedItemIds.size === 0) return;
+    const itemsToDelete = marketplaceItems.filter(
+      (item) =>
+        selectedItemIds.has(item.id) &&
+        (currentUser?.role === 'admin' || (currentUser && item.sellerId === currentUser.id))
+    );
+
+    if (itemsToDelete.length === 0) {
+      alert("Vous ne pouvez supprimer que les annonces qui vous appartiennent.");
+      return;
+    }
+
+    if (
+      confirm(
+        `Supprimer définitivement ${itemsToDelete.length} annonce(s) sélectionnée(s) ?`
+      )
+    ) {
+      itemsToDelete.forEach((item) => onDeleteMarketplaceItem?.(item.id));
+      setSelectedItemIds(new Set());
+      showToast(`🗑️ ${itemsToDelete.length} annonce(s) supprimée(s) avec succès !`);
+    }
+  };
+
+  const handleDeleteAllSoldItems = () => {
+    const soldItemsToDelete = marketplaceItems.filter(
+      (item) =>
+        item.isSold &&
+        (currentUser?.role === 'admin' || (currentUser && item.sellerId === currentUser.id))
+    );
+
+    if (soldItemsToDelete.length === 0) {
+      alert("Aucun article vendu trouvé parmi vos annonces.");
+      return;
+    }
+
+    if (
+      confirm(
+        `Supprimer définitivement vos ${soldItemsToDelete.length} article(s) marqué(s) comme VENDU(S) ?`
+      )
+    ) {
+      soldItemsToDelete.forEach((item) => onDeleteMarketplaceItem?.(item.id));
+      setSelectedItemIds((prev) => {
+        const next = new Set(prev);
+        soldItemsToDelete.forEach((i) => next.delete(i.id));
+        return next;
+      });
+      showToast(`🗑️ ${soldItemsToDelete.length} article(s) vendu(s) supprimé(s) avec succès !`);
+    }
   };
 
   const handleShareSingleItem = (item: MarketplaceItem, e?: React.MouseEvent) => {
@@ -269,6 +322,12 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
       return;
     }
 
+    const parsedPrice = parseInt(mPrice.replace(/[^\d]/g, ''), 10) || 0;
+    if (parsedPrice <= 0) {
+      alert('Veuillez renseigner un prix de vente valide supérieur à 0.');
+      return;
+    }
+
     const finalImages = mImages.length > 0
       ? mImages
       : ['https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80'];
@@ -277,7 +336,7 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
       id: `mkt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       title: mTitle.trim(),
       description: mDesc.trim() || 'Matériel de sécurité et livraison de qualité certifié.',
-      price: parseInt(mPrice),
+      price: parsedPrice,
       condition: mCondition,
       category: mCategory,
       imageUrl: finalImages[0],
@@ -312,6 +371,12 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
       return;
     }
 
+    const parsedDailyPrice = parseInt(rDailyPrice.replace(/[^\d]/g, ''), 10) || 0;
+    if (parsedDailyPrice <= 0) {
+      alert('Veuillez renseigner un tarif journalier valide supérieur à 0.');
+      return;
+    }
+
     const finalImages = rImages.length > 0
       ? rImages
       : ['https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600&auto=format&fit=crop&q=80'];
@@ -320,9 +385,9 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
       id: `rnt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       title: rTitle.trim(),
       vehicleType: rVehicleType,
-      dailyPrice: parseInt(rDailyPrice),
-      weeklyPrice: rWeeklyPrice ? parseInt(rWeeklyPrice) : undefined,
-      depositAmount: rDeposit ? parseInt(rDeposit) : undefined,
+      dailyPrice: parsedDailyPrice,
+      weeklyPrice: rWeeklyPrice ? (parseInt(rWeeklyPrice.replace(/[^\d]/g, ''), 10) || undefined) : undefined,
+      depositAmount: rDeposit ? (parseInt(rDeposit.replace(/[^\d]/g, ''), 10) || undefined) : undefined,
       city: rCity,
       country: 'Bénin',
       countryCode: 'BJ',
@@ -336,7 +401,7 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
       isAvailable: true,
       description: rDesc.trim() || 'Engin en excellent état avec visite technique, assurance et entretien régulier.',
       specs: {
-        payloadCapacityKg: rPayloadKg ? parseInt(rPayloadKg) : 150,
+        payloadCapacityKg: rPayloadKg ? (parseInt(rPayloadKg.replace(/[^\d]/g, ''), 10) || 150) : 150,
         fuelType: rFuelType,
         hasHelmetIncluded: rHelmetIncluded,
         hasInsurance: rInsuranceIncluded,
@@ -383,12 +448,17 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
   });
 
   const categoryLabels: Record<string, string> = {
+    electronics: '📱 Téléphonie & Électronique',
+    clothing: '👕 Mode & Vêtements',
+    food_grocery: '🛒 Alimentation & Épicerie',
+    beauty_health: '💄 Beauté, Cosmétique & Santé',
+    home_appliances: '🏠 Maison & Électroménager',
     gps_mount: '📱 Supports GPS & Chargeurs',
     delivery_bag: '🎒 Sacs Isothermes & Caissons',
     helmet: '🪖 Casques Homologués',
     jacket: '🦺 Gilets & Vêtements Pro',
     spare_parts: '⚙️ Pièces & Accessoires',
-    other: '📦 Autres Équipements',
+    other: '📦 Tous Autres Articles',
   };
 
   const vehicleLabels: Record<string, { label: string; icon: any; color: string }> = {
@@ -527,12 +597,17 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
               className="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
             >
               <option value="all">Toutes les Catégories</option>
+              <option value="electronics">📱 Téléphonie & Électronique</option>
+              <option value="clothing">👕 Mode & Vêtements</option>
+              <option value="food_grocery">🛒 Alimentation & Épicerie</option>
+              <option value="beauty_health">💄 Beauté, Cosmétique & Santé</option>
+              <option value="home_appliances">🏠 Maison & Électroménager</option>
               <option value="gps_mount">Supports GPS & Chargeurs</option>
               <option value="delivery_bag">Sacs Isothermes & Caissons</option>
               <option value="helmet">Casques Moto Homologués</option>
               <option value="jacket">Gilets & Vestes</option>
               <option value="spare_parts">Pièces Détachées</option>
-              <option value="other">Autres</option>
+              <option value="other">Autres Articles</option>
             </select>
           ) : (
             <select
@@ -660,18 +735,45 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                   Mes Annonces Uniquement
                 </button>
               )}
+
+              {/* Quick Delete Sold Items if user or admin has any sold items */}
+              {currentUser && marketplaceItems.some((i) => i.isSold && (currentUser.role === 'admin' || i.sellerId === currentUser.id)) && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAllSoldItems}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors border bg-red-950/40 hover:bg-red-900/60 text-red-300 border-red-800/50 flex items-center gap-1"
+                  title="Supprimer tous vos articles déjà vendus pour nettoyer vos annonces"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <span>Supprimer les vendus ({marketplaceItems.filter((i) => i.isSold && (currentUser.role === 'admin' || i.sellerId === currentUser.id)).length})</span>
+                </button>
+              )}
             </div>
 
             {/* Direct Quick Share Action if items selected */}
             {selectedItemIds.size > 0 && (
-              <button
-                type="button"
-                onClick={() => handleShareSelectedItems(marketplaceItems)}
-                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-transform active:scale-95"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Partager ({selectedItemIds.size}) annonces</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleShareSelectedItems(marketplaceItems)}
+                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-transform active:scale-95 cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Partager ({selectedItemIds.size})</span>
+                </button>
+
+                {currentUser && (
+                  <button
+                    type="button"
+                    onClick={handleBulkDeleteSelected}
+                    className="px-3 py-1.5 rounded-xl bg-red-600/90 hover:bg-red-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md transition-transform active:scale-95 cursor-pointer"
+                    title="Supprimer les annonces sélectionnées"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Supprimer ({selectedItemIds.size})</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -746,12 +848,40 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                         {isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                       </button>
 
-                      {/* Sold Banner Overlay */}
+                      {/* Sold Banner Overlay with Quick Delete button */}
                       {item.isSold && (
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center pointer-events-none">
-                          <span className="px-4 py-1.5 rounded-xl bg-red-600/90 text-white font-black text-sm tracking-widest uppercase shadow-xl rotate-[-6deg] border-2 border-white">
+                        <div
+                          className={`absolute inset-0 bg-black/75 backdrop-blur-[2px] flex flex-col items-center justify-center p-3 text-center z-10 ${
+                            isMyItem ? '' : 'cursor-pointer'
+                          }`}
+                          onClick={(e) => {
+                            if (!isMyItem) {
+                              e.stopPropagation();
+                              handleOpenLightbox(itemImages, item.title, `Vendu par ${item.sellerName} à ${item.sellerCity}`, activeImgIndex);
+                            }
+                          }}
+                        >
+                          <span className="px-4 py-1.5 rounded-xl bg-red-600 text-white font-black text-xs sm:text-sm tracking-widest uppercase shadow-xl rotate-[-4deg] border-2 border-white mb-3 pointer-events-none">
                             VENDU / ÉPUISÉ
                           </span>
+
+                          {/* Delete button right on the sold overlay for owner or admin */}
+                          {isMyItem && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Supprimer définitivement cette annonce vendue "${item.title}" ?`)) {
+                                  onDeleteMarketplaceItem?.(item.id);
+                                }
+                              }}
+                              className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xl border border-red-400 hover:scale-105 transition-all cursor-pointer"
+                              title="Supprimer cet article déjà vendu"
+                            >
+                              <Trash2 className="w-4 h-4 text-white" />
+                              <span>Supprimer l'article vendu</span>
+                            </button>
+                          )}
                         </div>
                       )}
 
@@ -840,18 +970,24 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                       {/* Action Buttons: Chat in-app, Call, WhatsApp */}
                       <div className="pt-3 border-t border-slate-800/80 space-y-2">
                         {/* 1. Direct In-App Chat (Conversations) */}
-                        <button
-                          onClick={() => handleStartConversation(item, 'marketplace')}
-                          className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
-                        >
-                          <MessageCircle className="w-4 h-4 text-blue-200" />
-                          <span>Discuter & Négocier (In-App)</span>
-                        </button>
+                        {item.isSold ? (
+                          <div className="w-full py-2 px-3 rounded-2xl bg-slate-800/80 border border-slate-700 text-slate-400 font-bold text-xs flex items-center justify-center gap-2">
+                            <span>🚫 Cet article est vendu / indisponible</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleStartConversation(item, 'marketplace')}
+                            className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+                          >
+                            <MessageCircle className="w-4 h-4 text-blue-200" />
+                            <span>Discuter & Négocier (In-App)</span>
+                          </button>
+                        )}
 
                         <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                           {/* Call Button */}
                           <a
-                            href={`tel:${item.sellerPhone.replace(/\s+/g, '')}`}
+                            href={`tel:${(item.sellerPhone || '').replace(/\s+/g, '')}`}
                             className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors flex items-center justify-center shrink-0"
                             title="Appeler directement"
                           >
@@ -860,8 +996,8 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
 
                           {/* WhatsApp Chat Button */}
                           <a
-                            href={`https://wa.me/${item.sellerPhone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
-                              `Bonjour ${item.sellerName}, je souhaite acheter votre article sur Liencolis : "${item.title}" (${item.price} FCFA).`
+                            href={`https://wa.me/${(item.sellerPhone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(
+                              `Bonjour ${item.sellerName || 'Vendeur'}, je souhaite acheter votre article sur Liencolis : "${item.title}" (${item.price} FCFA).`
                             )}`}
                             target="_blank"
                             rel="noreferrer"
@@ -913,14 +1049,19 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm('Supprimer définitivement cette annonce ?')) {
+                                if (confirm(item.isSold ? `Supprimer définitivement cette annonce vendue "${item.title}" ?` : 'Supprimer définitivement cette annonce ?')) {
                                   onDeleteMarketplaceItem?.(item.id);
                                 }
                               }}
-                              className="p-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 transition-colors"
-                              title="Supprimer l'annonce"
+                              className={`py-1.5 px-2 rounded-xl border flex items-center gap-1 text-[11px] font-bold transition-colors ${
+                                item.isSold
+                                  ? 'bg-red-600 hover:bg-red-500 text-white border-red-500 shadow-md animate-pulse'
+                                  : 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border-red-500/40'
+                              }`}
+                              title={item.isSold ? "Supprimer l'article vendu" : "Supprimer l'annonce"}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
+                              {item.isSold && <span>Supprimer</span>}
                             </button>
                           </div>
                         )}
@@ -994,6 +1135,7 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                 const rentalImages = rental.images && rental.images.length > 0 ? rental.images : [rental.imageUrl];
                 const activeImgIndex = carouselIndices[rental.id] || 0;
                 const currentImg = rentalImages[activeImgIndex] || rentalImages[0];
+                const isMyRental = currentUser && (rental.ownerId === currentUser.id || currentUser.role === 'admin');
                 const vConfig = vehicleLabels[rental.vehicleType] || {
                   label: 'Véhicule',
                   icon: Bike,
@@ -1159,7 +1301,7 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
 
                         <div className="flex items-center gap-2">
                           <a
-                            href={`tel:${rental.ownerPhone.replace(/\s+/g, '')}`}
+                            href={`tel:${(rental.ownerPhone || '').replace(/\s+/g, '')}`}
                             className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors flex items-center justify-center shrink-0"
                             title="Appeler le loueur"
                           >
@@ -1167,8 +1309,8 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                           </a>
 
                           <a
-                            href={`https://wa.me/${(rental.ownerWhatsapp || rental.ownerPhone).replace(/[^\d]/g, '')}?text=${encodeURIComponent(
-                              `Bonjour ${rental.ownerName}, je souhaite louer votre engin sur Liencolis : "${rental.title}" (${rental.dailyPrice} FCFA/jour).`
+                            href={`https://wa.me/${(rental.ownerWhatsapp || rental.ownerPhone || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(
+                              `Bonjour ${rental.ownerName || 'Loueur'}, je souhaite louer votre engin sur Liencolis : "${rental.title}" (${rental.dailyPrice} FCFA/jour).`
                             )}`}
                             target="_blank"
                             rel="noreferrer"
@@ -1177,6 +1319,23 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                             <MessageSquare className="w-3.5 h-3.5" />
                             <span>WhatsApp</span>
                           </a>
+
+                          {/* Delete Rental button for owner or admin */}
+                          {isMyRental && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Supprimer définitivement l'offre de location "${rental.title}" ?`)) {
+                                  onDeleteRentalItem?.(rental.id);
+                                }
+                              }}
+                              className="p-2.5 rounded-2xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 transition-colors flex items-center justify-center shrink-0"
+                              title="Supprimer mon offre de location"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1370,18 +1529,23 @@ export const MarketplaceAndRentals: React.FC<MarketplaceAndRentalsProps> = ({
                   </div>
 
                   <div>
-                    <label className="font-bold text-slate-200 block mb-1">Catégorie</label>
+                    <label className="font-bold text-slate-200 block mb-1">Catégorie de l'Article</label>
                     <select
                       value={mCategory}
                       onChange={(e) => setMCategory(e.target.value as any)}
                       className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                     >
+                      <option value="electronics">📱 Téléphonie & Électronique</option>
+                      <option value="clothing">👕 Mode & Vêtements</option>
+                      <option value="food_grocery">🛒 Alimentation & Épicerie</option>
+                      <option value="beauty_health">💄 Beauté, Cosmétique & Santé</option>
+                      <option value="home_appliances">🏠 Maison & Électroménager</option>
                       <option value="gps_mount">Support GPS & Chargeur</option>
                       <option value="delivery_bag">Sac Isotherme & Caisson</option>
                       <option value="helmet">Casque Moto Homologué</option>
                       <option value="jacket">Gilet / Veste Haute Visibilité</option>
                       <option value="spare_parts">Pièces & Accessoires</option>
-                      <option value="other">Autre équipement</option>
+                      <option value="other">Autre équipement / Divers</option>
                     </select>
                   </div>
 

@@ -408,6 +408,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             </div>
 
+            {/* If error is related to partitioned storage / iframe / missing initial state */}
+            {(authError.message.includes('Stockage de session') || authError.message.includes('iFrame') || authError.message.includes('partitionné')) && (
+              <div className="pt-2 border-t border-red-800/60 flex flex-col sm:flex-row gap-2">
+                <a
+                  href={typeof window !== 'undefined' ? window.location.href : '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Ouvrir dans un nouvel onglet</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthError(null);
+                    setMode('login');
+                  }}
+                  className="flex-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-600"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Utiliser Email / Mot de passe</span>
+                </button>
+              </div>
+            )}
+
             {authError.isEmailInUse && (
               <div className="pt-2 border-t border-red-800/60 flex items-center justify-between gap-2">
                 <span className="text-[11px] text-amber-300">Vous avez déjà un compte ?</span>

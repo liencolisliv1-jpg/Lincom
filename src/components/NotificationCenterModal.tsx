@@ -199,32 +199,51 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
         </div>
 
         {/* Web Push Permission Banner */}
-        <div className="p-3.5 bg-gradient-to-r from-blue-950/80 via-slate-900 to-emerald-950/80 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-xl bg-slate-800 border border-slate-700">
-              <Smartphone className="w-4 h-4 text-emerald-400" />
+        <div className="p-3.5 bg-gradient-to-r from-blue-950/80 via-slate-900 to-emerald-950/80 border-b border-slate-800 flex flex-col gap-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-xl bg-slate-800 border border-slate-700">
+                <Smartphone className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <span className="font-bold text-white">État du service Web Push : </span>
+                {browserPermission === 'granted' ? (
+                  <span className="text-emerald-400 font-bold">✅ Actif (Alertes système autorisées)</span>
+                ) : browserPermission === 'denied' ? (
+                  <span className="text-rose-400 font-bold">❌ Bloqué par le navigateur (Mode son & vibration in-app actif)</span>
+                ) : browserPermission === 'unsupported' ? (
+                  <span className="text-amber-300 font-bold">⚠️ Non supporté dans ce cadre (Ouvrir en plein écran)</span>
+                ) : (
+                  <span className="text-amber-300 font-bold">⚠️ En attente d'autorisation</span>
+                )}
+              </div>
             </div>
-            <div>
-              <span className="font-bold text-white">État du service Web Push : </span>
-              {browserPermission === 'granted' ? (
-                <span className="text-emerald-400 font-bold">✅ Actif (Alertes système autorisées)</span>
-              ) : browserPermission === 'denied' ? (
-                <span className="text-rose-400 font-bold">❌ Bloqué dans le navigateur (Mode son & vibration in-app actif)</span>
-              ) : (
-                <span className="text-amber-300 font-bold">⚠️ En attente d'autorisation</span>
-              )}
-            </div>
+
+            {browserPermission !== 'granted' && (
+              <button
+                onClick={handleRequestPermission}
+                disabled={isRequestingPermission}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition-all flex items-center gap-1.5"
+              >
+                <Bell className="w-3.5 h-3.5" />
+                <span>{isRequestingPermission ? 'Demande en cours...' : 'Autoriser les Notifications Push'}</span>
+              </button>
+            )}
           </div>
 
-          {browserPermission !== 'granted' && (
-            <button
-              onClick={handleRequestPermission}
-              disabled={isRequestingPermission}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition-all flex items-center gap-1.5"
-            >
-              <Bell className="w-3.5 h-3.5" />
-              <span>{isRequestingPermission ? 'Demande en cours...' : 'Autoriser les Notifications Push'}</span>
-            </button>
+          {/* Explanation if denied or unsupported in iframe/safari */}
+          {browserPermission === 'denied' && (
+            <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-[11px] text-rose-200/90 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-rose-300">Pourquoi cette mention apparaît ?</p>
+                <p className="mt-0.5 leading-relaxed">
+                  1. Les navigateurs (Chrome, Safari, Firefox) interdisent l'affichage des popups de notification Push système à l'intérieur d'un aperçu ou d'un cadre (iFrame).<br />
+                  2. Si vous avez cliqué sur "Bloquer" dans le passé, débloquez les notifications en cliquant sur le cadenas 🔒 à gauche de la barre d'adresse de votre navigateur.<br />
+                  <span className="text-emerald-300 font-semibold">👉 Rassurez-vous : Les alertes sonores (klaxon moto), vocales et vibrations continuent de fonctionner parfaitement dans l'application !</span>
+                </p>
+              </div>
+            </div>
           )}
         </div>
 

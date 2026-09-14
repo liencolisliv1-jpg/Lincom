@@ -18,6 +18,7 @@ import {
   LifeBuoy,
 } from 'lucide-react';
 import { Delivery } from '../types';
+import { voiceService } from '../services/voiceService';
 
 interface InAppCallScreenProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export const InAppCallScreen: React.FC<InAppCallScreenProps> = ({
   const [callDurationSeconds, setCallDurationSeconds] = useState(0);
   const timerRef = useRef<number | null>(null);
 
-  // Audio elements or synthetic tones
+  // Audio elements, realistic ringing tones & automated voice response
   useEffect(() => {
     if (!isOpen || !delivery) {
       setCallState('dialing');
@@ -51,23 +52,38 @@ export const InAppCallScreen: React.FC<InAppCallScreenProps> = ({
       return;
     }
 
-    // Progression of the simulated call
+    // Progression of the call
     setCallState('dialing');
     setCallDurationSeconds(0);
 
     const dialTimeout = setTimeout(() => {
       setCallState('ringing');
-    }, 1200);
+      voiceService.playPhoneRingBeep();
+    }, 1000);
+
+    const ringSecondTimeout = setTimeout(() => {
+      voiceService.playPhoneRingBeep();
+    }, 2400);
 
     const connectTimeout = setTimeout(() => {
       setCallState('connected');
+      voiceService.playCallConnectedTone();
       timerRef.current = window.setInterval(() => {
         setCallDurationSeconds((prev) => prev + 1);
       }, 1000);
-    }, 3200);
+
+      // Automated client voice response simulation for driver hands-free safety
+      setTimeout(() => {
+        const clientName = delivery.clientPseudo || 'le client';
+        voiceService.speak(
+          `Allô ? Oui bonjour conducteur Liencolis ! C'est ${clientName}. Je vous vois arriver sur la carte, je sors vous attendre devant la porte.`
+        );
+      }, 1200);
+    }, 3800);
 
     return () => {
       clearTimeout(dialTimeout);
+      clearTimeout(ringSecondTimeout);
       clearTimeout(connectTimeout);
       if (timerRef.current) clearInterval(timerRef.current);
     };
